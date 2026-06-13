@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    *,::after,::before{box-sizing:border-box}
+    body,html{margin:0;padding:0;width:100%}
+    @media (max-width:600px){
+      .email-wrapper{padding:16px !important}
+      .email-body{padding:28px 20px !important}
+      .btn-main{display:block !important;width:100% !important;text-align:center !important}
+      .cred-table td{display:block !important;width:100% !important}
+    }
+  </style>
+</head>
+<!--
+  USAGE: Send via Resend on customer registration or admin-created account.
+  Tokens to replace before sending:
+    {{CUSTOMER_NAME}}   – e.g. "Muhammad Ali"
+    {{APP_URL}}         – e.g. "https://aquaflow.vercel.app"
+    {{LOGIN_URL}}       – e.g. "https://aquaflow.vercel.app/login"
+    {{SUPPORT_EMAIL}}   – e.g. "support@aquaflow.pk"
+    {{TEMP_PASSWORD}}   – only for admin-created accounts (optional block)
+    {{YEAR}}            – current year
+-->
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+
+<div style="display:none;max-height:0;overflow:hidden">Welcome to AquaFlow — pure water delivered to your door 💧</div>
+
+<div class="email-wrapper" style="max-width:600px;margin:0 auto;padding:32px 16px">
+
+  <!-- Header -->
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center" style="padding-bottom:24px">
+        <table cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="background:#0ea5e9;border-radius:16px;padding:14px 20px;text-align:center">
+              <span style="font-size:28px">💧</span>
+              <div style="color:#fff;font-size:20px;font-weight:700;margin-top:4px;letter-spacing:-0.3px">AquaFlow</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Body card -->
+  <table class="email-body" width="100%" cellpadding="0" cellspacing="0"
+    style="background:#fff;border-radius:16px;padding:40px 36px;box-shadow:0 1px 3px rgba(0,0,0,.08)">
+
+    <!-- Greeting -->
+    <tr>
+      <td style="padding-bottom:20px">
+        <div style="font-size:26px;font-weight:800;color:#0f172a;line-height:1.2">
+          Welcome, {{CUSTOMER_NAME}}! 🎉
+        </div>
+        <div style="font-size:15px;color:#64748b;margin-top:8px;line-height:1.6">
+          Your AquaFlow account is ready. Enjoy fresh, pure water — delivered right to your door on your schedule.
+        </div>
+      </td>
+    </tr>
+
+    <!-- What you can do -->
+    <tr>
+      <td style="padding-bottom:28px">
+        <div style="font-size:13px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:16px">
+          What you can do
+        </div>
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:12px 0;border-bottom:1px solid #f1f5f9">
+              <table cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="width:36px;vertical-align:top;font-size:20px">🛒</td>
+                  <td style="padding-left:12px">
+                    <div style="font-weight:600;color:#0f172a;font-size:14px">Place orders</div>
+                    <div style="color:#64748b;font-size:13px;margin-top:2px">Choose your products, pick a delivery date &amp; time slot</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:12px 0;border-bottom:1px solid #f1f5f9">
+              <table cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="width:36px;vertical-align:top;font-size:20px">📍</td>
+                  <td style="padding-left:12px">
+                    <div style="font-weight:600;color:#0f172a;font-size:14px">Track deliveries</div>
+                    <div style="color:#64748b;font-size:13px;margin-top:2px">Get real-time updates as your order reaches you</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:12px 0">
+              <table cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="width:36px;vertical-align:top;font-size:20px">🧴</td>
+                  <td style="padding-left:12px">
+                    <div style="font-weight:600;color:#0f172a;font-size:14px">Manage your bottles</div>
+                    <div style="color:#64748b;font-size:13px;margin-top:2px">Track your bottle inventory and request refills easily</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Temp credentials block (only include when admin creates account) -->
+    <!-- REMOVE this block for self-registered customers -->
+    {{#if TEMP_PASSWORD}}
+    <tr>
+      <td style="padding-bottom:28px">
+        <div style="background:#fef9c3;border:1px solid #fde047;border-radius:12px;padding:20px">
+          <div style="font-size:13px;font-weight:700;color:#854d0e;margin-bottom:12px">
+            🔑 Your Login Credentials
+          </div>
+          <table class="cred-table" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="padding:6px 0;border-bottom:1px solid #fde047;font-size:13px;color:#713f12;width:40%">Email</td>
+              <td style="padding:6px 0;border-bottom:1px solid #fde047;font-size:13px;font-weight:600;color:#0f172a">{{CUSTOMER_EMAIL}}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;font-size:13px;color:#713f12">Temp Password</td>
+              <td style="padding:6px 0;font-size:13px;font-weight:700;color:#0f172a;font-family:monospace">{{TEMP_PASSWORD}}</td>
+            </tr>
+          </table>
+          <div style="margin-top:12px;font-size:12px;color:#92400e">
+            ⚠ Please change your password after your first login for security.
+          </div>
+        </div>
+      </td>
+    </tr>
+    {{/if TEMP_PASSWORD}}
+
+    <!-- CTA -->
+    <tr>
+      <td align="center" style="padding-bottom:28px">
+        <a class="btn-main" href="{{LOGIN_URL}}"
+          style="display:inline-block;background:#0ea5e9;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:10px;padding:14px 36px;letter-spacing:-.2px">
+          Go to My Account →
+        </a>
+      </td>
+    </tr>
+
+    <!-- Help -->
+    <tr>
+      <td style="background:#f8fafc;border-radius:10px;padding:18px 20px">
+        <div style="font-size:13px;color:#64748b;line-height:1.6">
+          Need help? Reply to this email or contact us at
+          <a href="mailto:{{SUPPORT_EMAIL}}" style="color:#0ea5e9;text-decoration:none">{{SUPPORT_EMAIL}}</a>.
+          We typically respond within a few hours.
+        </div>
+      </td>
+    </tr>
+
+  </table>
+
+  <!-- Footer -->
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px">
+    <tr>
+      <td align="center">
+        <div style="font-size:12px;color:#94a3b8;line-height:1.6">
+          © {{YEAR}} AquaFlow. All rights reserved.<br>
+          <a href="{{APP_URL}}" style="color:#94a3b8;text-decoration:underline">{{APP_URL}}</a>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+</div>
+</body>
+</html>

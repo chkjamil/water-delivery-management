@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Select-String \"next.config\")",
+      "PowerShell(Get-ChildItem \"E:\\\\kashif\\\\projects\\\\WaterDeliveryManagement\\\\Water Delivery Management\\\\aquaflow\" -File | Where-Object { $_.Name -match \"next.config|package.json|tsconfig\" } | Select-Object Name)",
+      "PowerShell($content = Get-Content \"E:\\\\kashif\\\\projects\\\\WaterDeliveryManagement\\\\Water Delivery Management\\\\aquaflow\\\\.next\\\\server\\\\chunks\\\\8543.js\" -Raw; $idx = $content.IndexOf\\('__dirname'\\); $content.Substring\\([Math]::Max\\(0,$idx-200\\), 400\\))"
+    ]
+  }
+}

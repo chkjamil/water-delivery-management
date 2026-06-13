@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml">
+<head>
+  <meta charset="utf-8">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    *,::after,::before{box-sizing:border-box}
+    body,html{margin:0;padding:0;width:100%}
+    table{border-collapse:collapse}
+    td{padding:0}
+    @media (max-width:600px){
+      .email-wrapper{padding:16px !important}
+      .email-body{padding:28px 20px !important}
+      .btn-main{display:block !important;width:100% !important;text-align:center !important}
+      .order-meta td{display:block !important;width:100% !important;border:none !important}
+    }
+  </style>
+</head>
+<!--
+  USAGE: Send via Resend / SMTP after order is created.
+  Replace {{ORDER_NUMBER}}, {{CUSTOMER_NAME}}, {{DELIVERY_DATE}},
+  {{TIME_SLOT}}, {{ITEMS_HTML}}, {{SUBTOTAL}}, {{DELIVERY_FEE}},
+  {{DISCOUNT}}, {{TOTAL}}, {{ADDRESS}}, {{PAYMENT_METHOD}},
+  {{ORDER_URL}}, {{APP_URL}} before sending.
+-->
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+
+<div style="display:none;max-height:0;overflow:hidden">Your order {{ORDER_NUMBER}} is confirmed — delivery on {{DELIVERY_DATE}} 💧</div>
+
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f1f5f9">
+  <tr>
+    <td align="center" class="email-wrapper" style="padding:40px 16px">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:#0f4c81;border-radius:16px 16px 0 0;padding:28px 40px;text-align:center">
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 12px">
+              <tr>
+                <td style="background:#fff;border-radius:14px;width:56px;height:56px;text-align:center;line-height:56px;font-size:28px">💧</td>
+              </tr>
+            </table>
+            <p style="margin:0;font-size:22px;font-weight:700;color:#fff">AquaFlow</p>
+            <p style="margin:4px 0 0;font-size:12px;color:#93c5fd;letter-spacing:0.5px;text-transform:uppercase">Water Delivery Management</p>
+          </td>
+        </tr>
+
+        <!-- Success banner -->
+        <tr>
+          <td style="background:#16a34a;padding:16px 40px;text-align:center">
+            <p style="margin:0;font-size:15px;font-weight:600;color:#fff">✓ &nbsp;Order Confirmed!</p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td class="email-body" style="background:#fff;padding:40px;color:#1e293b">
+
+            <p style="margin:0 0 6px;font-size:20px;font-weight:700;color:#0f172a">Hi {{CUSTOMER_NAME}},</p>
+            <p style="margin:0 0 28px;font-size:15px;color:#64748b;line-height:1.6">
+              Great news — your water delivery order has been confirmed. Here's a summary of what's on its way.
+            </p>
+
+            <!-- Order meta -->
+            <table class="order-meta" cellpadding="0" cellspacing="0" role="presentation" width="100%"
+                   style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:28px">
+              <tr>
+                <td style="padding:16px 20px;border-right:1px solid #e2e8f0;width:50%">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px">Order Number</p>
+                  <p style="margin:0;font-size:16px;font-weight:700;color:#0f4c81">{{ORDER_NUMBER}}</p>
+                </td>
+                <td style="padding:16px 20px;width:50%">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px">Delivery Date</p>
+                  <p style="margin:0;font-size:16px;font-weight:700;color:#0f172a">{{DELIVERY_DATE}}</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:16px 20px;border-top:1px solid #e2e8f0;border-right:1px solid #e2e8f0">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px">Time Slot</p>
+                  <p style="margin:0;font-size:14px;font-weight:600;color:#1e293b">{{TIME_SLOT}}</p>
+                </td>
+                <td style="padding:16px 20px;border-top:1px solid #e2e8f0">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px">Payment</p>
+                  <p style="margin:0;font-size:14px;font-weight:600;color:#1e293b">{{PAYMENT_METHOD}}</p>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Items -->
+            <p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#0f172a">Order Items</p>
+            <table cellpadding="0" cellspacing="0" role="presentation" width="100%" style="margin-bottom:20px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+              <tr style="background:#f8fafc">
+                <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.4px">Item</td>
+                <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;text-align:center">Qty</td>
+                <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;text-align:right">Price</td>
+              </tr>
+              {{ITEMS_HTML}}
+            </table>
+
+            <!-- Totals -->
+            <table cellpadding="0" cellspacing="0" role="presentation" width="100%" style="margin-bottom:28px">
+              <tr>
+                <td style="padding:4px 0;font-size:14px;color:#64748b">Subtotal</td>
+                <td style="padding:4px 0;font-size:14px;color:#1e293b;text-align:right">PKR {{SUBTOTAL}}</td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0;font-size:14px;color:#64748b">Delivery fee</td>
+                <td style="padding:4px 0;font-size:14px;color:#1e293b;text-align:right">PKR {{DELIVERY_FEE}}</td>
+              </tr>
+              {{#if DISCOUNT}}
+              <tr>
+                <td style="padding:4px 0;font-size:14px;color:#16a34a">Discount</td>
+                <td style="padding:4px 0;font-size:14px;color:#16a34a;text-align:right">− PKR {{DISCOUNT}}</td>
+              </tr>
+              {{/if}}
+              <tr>
+                <td style="padding:12px 0 0;font-size:16px;font-weight:700;color:#0f172a;border-top:2px solid #e2e8f0">Total</td>
+                <td style="padding:12px 0 0;font-size:16px;font-weight:700;color:#0f4c81;text-align:right;border-top:2px solid #e2e8f0">PKR {{TOTAL}}</td>
+              </tr>
+            </table>
+
+            <!-- Delivery address -->
+            <table cellpadding="0" cellspacing="0" role="presentation" width="100%"
+                   style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;margin-bottom:28px">
+              <tr>
+                <td style="padding:16px 20px">
+                  <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:0.4px">📍 Delivery Address</p>
+                  <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5">{{ADDRESS}}</p>
+                </td>
+              </tr>
+            </table>
+
+            <!-- CTA -->
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto">
+              <tr>
+                <td style="border-radius:10px;background:#0f4c81">
+                  <a href="{{ORDER_URL}}"
+                     class="btn-main"
+                     style="display:inline-block;padding:13px 32px;font-size:14px;font-weight:600;color:#fff;text-decoration:none;border-radius:10px">
+                    📦 &nbsp;Track Your Order
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f8fafc;border-radius:0 0 16px 16px;padding:24px 40px;border-top:1px solid #e2e8f0;text-align:center">
+            <p style="margin:0 0 6px;font-size:13px;color:#64748b">Questions? Contact us by replying to this email.</p>
+            <p style="margin:8px 0 0;font-size:12px;color:#94a3b8">&copy; 2025 AquaFlow &nbsp;·&nbsp;
+              <a href="{{APP_URL}}" style="color:#0f4c81;text-decoration:none">{{APP_URL}}</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>
