@@ -28,7 +28,7 @@ export default async function POSPage() {
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="print:hidden">
         <h1 className="text-xl font-bold text-slate-800">Point of Sale</h1>
         <p className="text-sm text-slate-500 mt-0.5">Walk-in sales — tap a product to add to cart</p>
       </div>

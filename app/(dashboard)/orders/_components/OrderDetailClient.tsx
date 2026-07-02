@@ -61,7 +61,7 @@ export default function OrderDetailClient({ order: initial, canEdit }: Props) {
     <div className="space-y-5 max-w-3xl print:max-w-none">
       {/* Back + Header */}
       <div>
-        <Link href="/orders" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-3">
+        <Link href="/orders" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-3 print:hidden">
           <ArrowLeft size={14} /> Back to Orders
         </Link>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -80,7 +80,7 @@ export default function OrderDetailClient({ order: initial, canEdit }: Props) {
               <Printer size={14} className="inline -mt-0.5 mr-1" />Receipt
             </button>
             {canEdit && !isCancelled && order.status !== "delivered" && (
-              <>
+              <div className="flex items-center gap-2 flex-wrap print:hidden">
                 <button onClick={() => setModal("status")} className="btn-primary btn-sm">Update Status</button>
                 {order.payment_status !== "paid" && (
                   <button onClick={() => setModal("payment")} className="btn-secondary btn-sm text-green-600">Record Payment</button>
@@ -88,7 +88,7 @@ export default function OrderDetailClient({ order: initial, canEdit }: Props) {
                 {["pending", "confirmed"].includes(order.status) && (
                   <button onClick={() => setModal("cancel")} className="btn-secondary btn-sm text-red-500">Cancel</button>
                 )}
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -96,7 +96,7 @@ export default function OrderDetailClient({ order: initial, canEdit }: Props) {
 
       {/* Status timeline */}
       {!isCancelled && (
-        <div className="card p-4">
+        <div className="card p-4 print:hidden">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Order Progress</p>
           <div className="flex items-center gap-0">
             {ORDER_STEPS.map((step, i) => {

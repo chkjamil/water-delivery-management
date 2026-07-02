@@ -5,6 +5,7 @@ import ProductGrid from "./ProductGrid";
 import Cart from "./Cart";
 import CustomerSearch from "./CustomerSearch";
 import PaymentModal from "./PaymentModal";
+import POSReceipt, { type ReceiptData } from "./POSReceipt";
 import { createPOSOrder, type POSOrderItem, type CreatePOSOrderInput } from "../actions";
 import toast from "react-hot-toast";
 import type { ProductType } from "@/types";
@@ -49,6 +50,7 @@ export default function POSClient({ initialProducts }: Props) {
   const [discount, setDiscount]      = useState(0);
   const [showPayment, setShowPayment] = useState(false);
   const [lastOrder, setLastOrder]    = useState<{ id: string; order_number: string } | null>(null);
+  const [receipt, setReceipt]        = useState<ReceiptData | null>(null);
   const [isPending, start]           = useTransition();
 
   // ── Cart helpers ──────────────────────────────────────────────────────────
@@ -93,6 +95,7 @@ export default function POSClient({ initialProducts }: Props) {
     setCustomer(null);
     setDiscount(0);
     setLastOrder(null);
+    setReceipt(null);
   }, []);
 
   // ── Totals ────────────────────────────────────────────────────────────────
@@ -127,15 +130,37 @@ export default function POSClient({ initialProducts }: Props) {
       const result = await createPOSOrder(input);
       if (result.error) { toast.error(result.error); return; }
       toast.success("Order placed!");
+
       setLastOrder(result.order ?? null);
+      setReceipt({
+        order_number:   result.order?.order_number ?? "",
+        created_at:     new Date().toISOString(),
+        customer,
+        items:          cart,
+        subtotal,
+        discount,
+        total,
+        payment_method: paymentInput.payment_method,
+        amount_paid:    paymentInput.amount_paid,
+      });
       setShowPayment(false);
       setCart([]);
       setDiscount(0);
+
+      // Ask before printing so a distracted cashier doesn't skip it, then
+      // jump straight to the next sale once the print dialog is dismissed.
+      if (confirm("Order placed! Print receipt now?")) {
+        setTimeout(() => {
+          window.print();
+          clearCart();
+        }, 50);
+      }
     });
   }
 
   return (
-    <div className="flex flex-col md:flex-row gap-4 h-[calc(100vh-120px)] min-h-[600px]">
+    <>
+    <div className="flex flex-col md:flex-row gap-4 h-[calc(100vh-120px)] min-h-[600px] print:hidden">
 
       {/* ── Left: Product grid ── */}
       <div className="flex-1 overflow-hidden flex flex-col min-w-0">
@@ -179,5 +204,8 @@ export default function POSClient({ initialProducts }: Props) {
         />
       )}
     </div>
+
+    <POSReceipt receipt={receipt} />
+    </>
   );
 }

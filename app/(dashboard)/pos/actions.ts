@@ -97,9 +97,11 @@ export async function createPOSOrder(input: CreatePOSOrderInput) {
   if (input.total <= 0)    return { error: "Invalid order total" };
 
   // ── 1. Create order ──
-  // Only include customer_id when a real customer is selected (walk-in omits it)
+  // Only include customer_id when a real customer is selected. No customer
+  // selected = walk-in (no account) — the sale is handed over on the spot,
+  // so it's recorded as already delivered rather than pending fulfillment.
   const orderPayload: Record<string, unknown> = {
-    status:               "confirmed",
+    status:               input.customer_id ? "confirmed" : "delivered",
     order_type:           "pos",
     subtotal:             input.subtotal,
     discount_amount:      input.discount,
