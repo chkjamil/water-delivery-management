@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import type { UserRole } from "@/types";
-import { Building2, MapPin, Clock, Users, Bell, User, CreditCard } from "lucide-react";
+import { Building2, MapPin, Clock, Users, User, CreditCard } from "lucide-react";
 
 interface NavItem {
   href: string;
@@ -20,7 +20,6 @@ const SETTINGS_NAV: NavItem[] = [
   { href: "/settings/zones",         label: "Delivery Zones",    icon: MapPin,    roles: ["super_admin", "admin"],   description: "Areas & fees"         },
   { href: "/settings/time-slots",    label: "Time Slots",        icon: Clock,     roles: ["super_admin", "admin"],   description: "Delivery windows"     },
   { href: "/settings/users",         label: "Users & Roles",     icon: Users,     roles: ["super_admin"],           description: "Staff & permissions"  },
-  { href: "/settings/notifications", label: "Notifications",     icon: Bell,      roles: ["super_admin", "admin"],   description: "Email & SMS alerts"   },
   { href: "/settings/profile",       label: "My Profile",        icon: User,      roles: ["super_admin", "admin"],   description: "Password & details"   },
 ];
 

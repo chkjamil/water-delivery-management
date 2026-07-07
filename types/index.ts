@@ -225,6 +225,23 @@ export interface Delivery {
   updated_at: string;
 }
 
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export type NotificationType = "order_status_changed" | "delivery_assigned" | "low_stock_alert";
+
+export interface Notification {
+  id: string;
+  recipient_id: string;
+  type: NotificationType;
+  title: string;
+  message: string | null;
+  related_order_id: string | null;
+  related_delivery_id: string | null;
+  related_product_id: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────
 
 export interface DashboardStats {

@@ -62,7 +62,7 @@ export default function DashboardLayoutClient({ role, fullName, email, children 
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title={title} onMenuClick={() => setSidebarOpen(true)} />
+        <Header title={title} role={role} onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto">
           <div className="p-4 md:p-6 max-w-7xl mx-auto">
             {children}
