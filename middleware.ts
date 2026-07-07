@@ -1,7 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password"];
+const PUBLIC_ROUTES = ["/login", "/register", "/forgot-password"];
+
+// Reachable regardless of auth state: unauthenticated visits show
+// "invalid/expired link"; authenticated visits are the expected case
+// (session was just created via the recovery code exchange in
+// /auth/callback) and must NOT be bounced away like other public routes.
+const ALWAYS_ALLOWED_ROUTES = ["/reset-password"];
 
 // Routes only customers can access
 const CUSTOMER_ROUTES = ["/order", "/my-orders"];
@@ -48,7 +54,12 @@ export async function middleware(request: NextRequest) {
     role = (profile?.role as string) ?? "customer";
   }
 
-  // ── 1. Public routes ───────────────────────────────────────────────────────
+  // ── 1. Always-allowed routes (bypass auth-based redirects entirely) ────────
+  if (ALWAYS_ALLOWED_ROUTES.some((r) => pathname.startsWith(r))) {
+    return supabaseResponse;
+  }
+
+  // ── 2. Public routes ───────────────────────────────────────────────────────
   if (PUBLIC_ROUTES.some((r) => pathname.startsWith(r))) {
     if (user) {
       const dest = role === "customer" ? "/order" : "/dashboard";
@@ -57,21 +68,21 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // ── 2. Root redirect ───────────────────────────────────────────────────────
+  // ── 3. Root redirect ───────────────────────────────────────────────────────
   if (pathname === "/") {
     if (!user) return NextResponse.redirect(new URL("/login", request.url));
     const dest = role === "customer" ? "/order" : "/dashboard";
     return NextResponse.redirect(new URL(dest, request.url));
   }
 
-  // ── 3. Require authentication ──────────────────────────────────────────────
+  // ── 4. Require authentication ──────────────────────────────────────────────
   if (!user) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // ── 4. Role-based route separation ────────────────────────────────────────
+  // ── 5. Role-based route separation ────────────────────────────────────────
   const isCustomerRoute = CUSTOMER_ROUTES.some(
     (p) => pathname === p || pathname.startsWith(p + "/")
   );

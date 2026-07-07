@@ -40,7 +40,8 @@ export default function RegisterForm() {
     if (form.password !== form.confirm_password)    { toast.error("Passwords don't match"); return; }
 
     setLoading(true);
-    const phone = normalizePKPhone(form.phone.replace(/[\s\-()]/g, ""));
+    const phone  = normalizePKPhone(form.phone.replace(/[\s\-()]/g, ""));
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
 
     const { error } = await supabase.auth.signUp({
       email:    form.email,
@@ -51,7 +52,7 @@ export default function RegisterForm() {
           phone,
           role: "customer",
         },
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+        emailRedirectTo: `${appUrl}/auth/callback?next=/dashboard`,
       },
     });
 

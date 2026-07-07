@@ -31,6 +31,13 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=session_exchange_failed`);
   }
 
+  // Password-recovery flow: session is established, hand off to reset-password.
+  // Skip welcome-email / phone-verification side effects below — those are
+  // signup-specific and would misfire for an existing user resetting a password.
+  if (next === "/reset-password") {
+    return NextResponse.redirect(`${origin}${next}`);
+  }
+
   // Fetch profile to check if this is the first confirmation
   const { data: profile } = await supabase
     .from("profiles")

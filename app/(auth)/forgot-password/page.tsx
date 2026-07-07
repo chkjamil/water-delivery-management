@@ -14,8 +14,9 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setLoading(true);
     const supabase = createClient();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${appUrl}/auth/callback?next=/reset-password`,
     });
     setLoading(false);
     if (error) { toast.error(error.message); return; }
