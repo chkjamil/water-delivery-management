@@ -120,7 +120,7 @@ export default function ProductCatalog({ products, cart, onAdd, onUpdateQty, all
                         "text-xs font-medium",
                         outOfStock ? "text-red-500" : stock <= 5 ? "text-amber-600" : "text-slate-400"
                       )}>
-                        {outOfStock ? "Out of stock" : stock <= 5 ? `Only ${stock} left` : `${stock} available`}
+                        {outOfStock ? "Out of stock" : stock <= 5 ? "Only a few left" : "In stock"}
                       </span>
 
                       {/* Add / Qty controls */}
