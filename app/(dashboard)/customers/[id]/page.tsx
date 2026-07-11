@@ -2,7 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
-import { ArrowLeft, Mail, Phone, ShieldCheck, ShieldX, MapPin, Package } from "lucide-react";
+import { ArrowLeft, Mail, Phone, ShieldCheck, ShieldX, Package } from "lucide-react";
+import AddressesPanel from "./_components/AddressesPanel";
+import DeliveryPreferencePanel from "./_components/DeliveryPreferencePanel";
+import StandingItemsPanel from "./_components/StandingItemsPanel";
+import CreditLedgerPanel from "./_components/CreditLedgerPanel";
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,7 +21,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const { data: profile } = await supabase
     .from("profiles")
     .select(`id, full_name, email, phone, is_active, phone_verified, created_at,
-             customers(credit_balance, total_spent, loyalty_points, notes)`)
+             customers(credit_balance, loyalty_points, notes, payment_method_preference)`)
     .eq("id", id)
     .eq("role", "customer")
     .single();
@@ -26,10 +30,19 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   const c = Array.isArray(profile.customers) ? profile.customers[0] : profile.customers;
 
+  // customers.total_spent is never actually maintained anywhere in this codebase
+  // (always stuck at its 0 default) — compute it from delivered orders instead.
+  const { data: spentRow } = await supabase
+    .from("customer_total_spent_view")
+    .select("total_spent")
+    .eq("customer_id", id)
+    .maybeSingle();
+  const totalSpent = spentRow?.total_spent ?? 0;
+
   // Fetch addresses
   const { data: addresses } = await supabase
     .from("customer_addresses")
-    .select("id, label, address_line1, address_line2, city, is_default")
+    .select("id, label, address_line1, address_line2, city, is_default, zone_id")
     .eq("customer_id", id)
     .order("is_default", { ascending: false });
 
@@ -46,6 +59,47 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     .from("customer_bottles")
     .select("quantity_owned, updated_at, product:products(name, size_label)")
     .eq("customer_id", id);
+
+  // Fetch delivery scheduling data
+  const { data: deliveryPreference } = await supabase
+    .from("customer_delivery_preferences")
+    .select("frequency, days_of_week, days_of_month, biweekly_anchor_date, address_id, is_active")
+    .eq("customer_id", id)
+    .maybeSingle();
+
+  const { data: standingItems } = await supabase
+    .from("customer_standing_items")
+    .select("product_id, quantity")
+    .eq("customer_id", id);
+
+  const { data: zones } = await supabase
+    .from("delivery_zones")
+    .select("id, name, delivery_fee, is_active, created_at")
+    .eq("is_active", true)
+    .order("name");
+
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, name, size_label")
+    .eq("is_active", true)
+    .order("name");
+
+  const { data: creditTransactions } = await supabase
+    .from("customer_credit_transactions")
+    .select("id, type, amount, note, created_at")
+    .eq("customer_id", id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  const today = new Date().toISOString().split("T")[0];
+  const { data: upcomingStops } = await supabase
+    .from("delivery_stops")
+    .select("id, stop_date, status")
+    .eq("customer_id", id)
+    .eq("status", "pending")
+    .gte("stop_date", today)
+    .order("stop_date")
+    .limit(5);
 
   const STATUS_COLOR: Record<string, string> = {
     pending:   "bg-yellow-100 text-yellow-700",
@@ -105,7 +159,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <p className="text-xs text-slate-400">Total Spent</p>
-              <p className="text-lg font-bold text-slate-800">PKR {(c?.total_spent ?? 0).toLocaleString()}</p>
+              <p className="text-lg font-bold text-slate-800">PKR {totalSpent.toLocaleString()}</p>
             </div>
             <div>
               <p className="text-xs text-slate-400">Credit Owed</p>
@@ -131,32 +185,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       <div className="grid md:grid-cols-2 gap-5">
 
         {/* Addresses */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
-              <MapPin size={15} className="text-brand-600" /> Delivery Addresses
-            </h2>
-          </div>
-          <div className="card-body p-0">
-            {addresses && addresses.length > 0 ? (
-              <div className="divide-y divide-slate-50">
-                {addresses.map((a) => (
-                  <div key={a.id} className="px-5 py-3">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-xs font-semibold text-slate-700">{a.label}</span>
-                      {a.is_default && <span className="badge bg-brand-100 text-brand-700 text-xs">Default</span>}
-                    </div>
-                    <p className="text-sm text-slate-600">{a.address_line1}</p>
-                    {a.address_line2 && <p className="text-xs text-slate-400">{a.address_line2}</p>}
-                    <p className="text-xs text-slate-400">{a.city}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="px-5 py-4 text-sm text-slate-400">No addresses saved</p>
-            )}
-          </div>
-        </div>
+        <AddressesPanel customerId={id} initialAddresses={addresses ?? []} zones={zones ?? []} />
 
         {/* Bottle ledger */}
         <div className="card">
@@ -183,6 +212,51 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               </div>
             ) : (
               <p className="px-5 py-4 text-sm text-slate-400">No bottles on ledger</p>
+            )}
+          </div>
+        </div>
+
+        {/* Delivery schedule + payment preference */}
+        <DeliveryPreferencePanel
+          customerId={id}
+          initialPreference={deliveryPreference ?? null}
+          initialPaymentPreference={c?.payment_method_preference ?? "cash"}
+          addresses={(addresses ?? []).map((a) => ({ id: a.id, label: a.label, zone_id: a.zone_id, is_default: a.is_default }))}
+        />
+
+        {/* Standing order */}
+        <StandingItemsPanel
+          customerId={id}
+          initialItems={standingItems ?? []}
+          products={products ?? []}
+        />
+
+        {/* Credit balance + settlement */}
+        <CreditLedgerPanel
+          customerId={id}
+          creditBalance={c?.credit_balance ?? 0}
+          initialTransactions={creditTransactions ?? []}
+        />
+
+        {/* Upcoming scheduled deliveries */}
+        <div className="card">
+          <div className="card-header">
+            <h2 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
+              📅 Upcoming Deliveries
+            </h2>
+          </div>
+          <div className="card-body p-0">
+            {upcomingStops && upcomingStops.length > 0 ? (
+              <div className="divide-y divide-slate-50">
+                {upcomingStops.map((s) => (
+                  <div key={s.id} className="px-5 py-3 flex items-center justify-between text-sm">
+                    <span className="text-slate-700">{format(new Date(s.stop_date + "T00:00:00"), "EEE, MMM d, yyyy")}</span>
+                    <span className="badge bg-amber-100 text-amber-700 text-xs">pending</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="px-5 py-4 text-sm text-slate-400">No upcoming stops generated yet</p>
             )}
           </div>
         </div>

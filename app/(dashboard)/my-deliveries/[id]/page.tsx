@@ -14,7 +14,7 @@ export default async function MyDeliveryDetailPage({ params }: { params: Promise
   const { data: profile } = await supabase
     .from("profiles").select("role").eq("id", user.id).single();
 
-  const allowed = ["super_admin", "admin", "staff"];
+  const allowed = ["super_admin", "admin", "staff", "delivery_person"];
   if (!profile || !allowed.includes(profile.role)) redirect("/dashboard");
 
   const { data: delivery, error } = await supabase
@@ -38,8 +38,8 @@ export default async function MyDeliveryDetailPage({ params }: { params: Promise
 
   if (error || !delivery) notFound();
 
-  // Guard: staff can only see their own deliveries
-  if (profile.role === "staff") {
+  // Guard: staff/delivery_person can only see their own deliveries
+  if (profile.role === "staff" || profile.role === "delivery_person") {
     const { data: d } = await supabase.from("deliveries").select("driver_id").eq("id", id).single();
     if (d?.driver_id !== user.id) redirect("/my-deliveries");
   }

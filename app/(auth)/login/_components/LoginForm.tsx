@@ -21,7 +21,7 @@ export default function LoginForm() {
     setLoading(true);
 
     const supabase = createClient();
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       toast.error(error.message || "Invalid email or password");
@@ -31,14 +31,9 @@ export default function LoginForm() {
 
     toast.success("Welcome back!");
 
-    // Determine home page from role in user_metadata (set at account creation).
-    // Falls back to /dashboard which shows a role-appropriate view.
-    const role = (data.user?.user_metadata?.role as string) ?? "";
-    const home  = role === "customer" ? "/order" : "/dashboard";
-
-    // If there's an explicit redirect param use it, otherwise go to role home
-    const dest = redirectTo !== "/dashboard" ? redirectTo : home;
-    router.push(dest);
+    // Every role's home page is /dashboard (its role-appropriate view is chosen
+    // server-side); an explicit redirect param takes priority when present.
+    router.push(redirectTo);
     router.refresh();
   }
 

@@ -2,17 +2,52 @@
 
 import Link from "next/link";
 import { format } from "date-fns";
-import { Plus, ShoppingBag } from "lucide-react";
+import { Plus, ShoppingBag, CalendarClock, MapPin, Wallet, Package } from "lucide-react";
+import StatusBadge from "@/components/ui/StatusBadge";
 
-interface Order { id: string; order_number: string; status: string; total_amount: number; delivery_date: string | null; created_at: string; }
+interface Order { id: string; order_number: string; status: string; payment_status: string; total_amount: number; delivery_date: string | null; created_at: string; }
+interface DeliveryPreference { frequency: "weekly" | "biweekly" | "monthly"; days_of_week: number[]; days_of_month: number[]; is_active: boolean; }
+interface Address { id: string; label: string; address_line1: string; address_line2: string | null; city: string; is_default: boolean; }
+interface BottleRow { quantity_owned: number; product: { name: string; size_label: string } | null; }
 
 const STATUS_BADGE: Record<string, string> = {
   pending: "badge-pending", confirmed: "badge-confirmed", dispatched: "badge-dispatch",
   en_route: "badge-enroute", delivered: "badge-delivered", cancelled: "badge-cancelled",
 };
 
-export default function CustomerDashboard({ orders, fullName }: { orders: Order[]; fullName: string; }) {
+const DOW_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function ordinal(n: number) {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function describeSchedule(pref: DeliveryPreference | null): string | null {
+  if (!pref || !pref.is_active) return null;
+  if (pref.frequency === "monthly") {
+    if (pref.days_of_month.length === 0) return null;
+    return `Monthly, on the ${pref.days_of_month.map(ordinal).join(" & ")}`;
+  }
+  if (pref.days_of_week.length === 0) return null;
+  const days = pref.days_of_week.map((d) => DOW_LABELS[d]).join(" & ");
+  return pref.frequency === "biweekly" ? `Every 2 weeks on ${days}` : `Every ${days}`;
+}
+
+export default function CustomerDashboard({
+  orders, fullName, deliveryPreference, addresses, paymentPreference, creditBalance, bottles,
+}: {
+  orders: Order[];
+  fullName: string;
+  deliveryPreference: DeliveryPreference | null;
+  addresses: Address[];
+  paymentPreference: "cash" | "monthly";
+  creditBalance: number;
+  bottles: BottleRow[];
+}) {
   const activeOrder = orders.find((o) => !["delivered", "cancelled", "failed"].includes(o.status));
+  const scheduleText = describeSchedule(deliveryPreference);
+  const defaultAddress = addresses.find((a) => a.is_default) ?? addresses[0];
 
   return (
     <div className="space-y-6">
@@ -20,6 +55,40 @@ export default function CustomerDashboard({ orders, fullName }: { orders: Order[
         <h2 className="text-xl font-bold text-slate-800">Hi, {fullName.split(" ")[0]}! 👋</h2>
         <p className="text-slate-500 text-sm mt-1">Manage your water deliveries.</p>
       </div>
+
+      {/* Recurring delivery schedule summary */}
+      {(scheduleText || defaultAddress || paymentPreference === "monthly") && (
+        <div className="card p-4 space-y-2">
+          {scheduleText && (
+            <div className="flex items-center gap-2 text-sm text-slate-700">
+              <CalendarClock size={15} className="text-brand-600 flex-shrink-0" />
+              <span>{scheduleText}</span>
+            </div>
+          )}
+          {defaultAddress && (
+            <div className="flex items-center gap-2 text-sm text-slate-700">
+              <MapPin size={15} className="text-brand-600 flex-shrink-0" />
+              <span>{defaultAddress.address_line1}, {defaultAddress.city}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-sm text-slate-700">
+            <Wallet size={15} className="text-brand-600 flex-shrink-0" />
+            <span>
+              {paymentPreference === "monthly" ? "Monthly account" : "Cash on delivery"}
+              {creditBalance > 0 && <span className="text-red-600 font-medium"> · PKR {creditBalance.toLocaleString()} due</span>}
+            </span>
+          </div>
+          {bottles.length > 0 && (
+            <div className="flex items-start gap-2 text-sm text-slate-700 pt-1 border-t border-slate-100">
+              <Package size={15} className="text-brand-600 flex-shrink-0 mt-0.5" />
+              <span>
+                <span className="text-xs text-slate-400 block">Bottles currently at your address (not part of the amount due):</span>
+                {bottles.map((b) => `${b.product?.name ?? "Bottle"} x${b.quantity_owned}`).join(", ")}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Active order banner */}
       {activeOrder && (
@@ -34,9 +103,12 @@ export default function CustomerDashboard({ orders, fullName }: { orders: Order[
                 </p>
               )}
             </div>
-            <span className={`badge ${STATUS_BADGE[activeOrder.status] || "badge-pending"}`}>
-              {activeOrder.status}
-            </span>
+            <div className="flex flex-col items-end gap-1">
+              <span className={`badge ${STATUS_BADGE[activeOrder.status] || "badge-pending"}`}>
+                {activeOrder.status}
+              </span>
+              <StatusBadge status={activeOrder.payment_status} type="payment" />
+            </div>
           </div>
         </div>
       )}
@@ -72,11 +144,12 @@ export default function CustomerDashboard({ orders, fullName }: { orders: Order[
                     {order.delivery_date && ` · Delivery: ${format(new Date(order.delivery_date), "MMM d")}`}
                   </p>
                 </div>
-                <div className="text-right flex-shrink-0">
+                <div className="text-right flex-shrink-0 space-y-1">
                   <p className="text-sm font-bold text-slate-800">PKR {order.total_amount}</p>
-                  <span className={`badge ${STATUS_BADGE[order.status] || "badge-pending"} mt-1`}>
+                  <span className={`badge ${STATUS_BADGE[order.status] || "badge-pending"}`}>
                     {order.status}
                   </span>
+                  <StatusBadge status={order.payment_status} type="payment" className="block" />
                 </div>
               </Link>
             ))}

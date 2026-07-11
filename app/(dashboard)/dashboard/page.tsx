@@ -91,7 +91,7 @@ export default async function DashboardPage() {
     return <AdminDashboard stats={stats} role={role} fullName={profile?.full_name || ""} />;
   }
 
-  if (role === "staff") {
+  if (role === "staff" || role === "delivery_person") {
     const { data: myDeliveries } = await supabase
       .from("deliveries")
       .select("id, status, order:orders(order_number, delivery_date, address:customer_addresses(address_line1, city))")
@@ -103,12 +103,46 @@ export default async function DashboardPage() {
   }
 
   // Customer
-  const { data: myOrders } = await supabase
-    .from("orders")
-    .select("id, order_number, status, total_amount, delivery_date, created_at")
-    .eq("customer_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(5);
+  const [{ data: myOrders }, { data: deliveryPreference }, { data: addresses }, { data: customerRow }, { data: bottles }] = await Promise.all([
+    supabase
+      .from("orders")
+      .select("id, order_number, status, payment_status, total_amount, delivery_date, created_at")
+      .eq("customer_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("customer_delivery_preferences")
+      .select("frequency, days_of_week, days_of_month, is_active")
+      .eq("customer_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("customer_addresses")
+      .select("id, label, address_line1, address_line2, city, is_default")
+      .eq("customer_id", user.id)
+      .order("is_default", { ascending: false }),
+    supabase
+      .from("customers")
+      .select("payment_method_preference, credit_balance")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("customer_bottles")
+      .select("quantity_owned, product:products(name, size_label)")
+      .eq("customer_id", user.id),
+  ]);
 
-  return <CustomerDashboard orders={myOrders || []} fullName={profile?.full_name || ""} />;
+  return (
+    <CustomerDashboard
+      orders={myOrders || []}
+      fullName={profile?.full_name || ""}
+      deliveryPreference={deliveryPreference ?? null}
+      addresses={addresses ?? []}
+      paymentPreference={customerRow?.payment_method_preference ?? "cash"}
+      creditBalance={customerRow?.credit_balance ?? 0}
+      bottles={(bottles ?? []).map((b: any) => ({
+        quantity_owned: b.quantity_owned,
+        product: Array.isArray(b.product) ? (b.product[0] ?? null) : b.product,
+      }))}
+    />
+  );
 }

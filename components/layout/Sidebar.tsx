@@ -8,7 +8,7 @@ import { getNavForRole } from "@/lib/permissions";
 import {
   LayoutDashboard, ShoppingBag, Truck, Package, ShoppingCart,
   Users, BarChart2, Settings, MapPin, ClipboardList, Plus, X,
-  LogOut,
+  LogOut, CalendarRange, CalendarDays,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -16,7 +16,7 @@ import toast from "react-hot-toast";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   LayoutDashboard, ShoppingBag, Truck, Package, ShoppingCart,
-  Users, BarChart2, Settings, MapPin, ClipboardList, Plus,
+  Users, BarChart2, Settings, MapPin, ClipboardList, Plus, CalendarRange, CalendarDays,
 };
 
 interface SidebarProps {
@@ -32,16 +32,18 @@ export default function Sidebar({ role, fullName, email, onClose }: SidebarProps
   const navItems = getNavForRole(role);
 
   const roleColors: Record<UserRole, string> = {
-    super_admin: "bg-amber-100 text-amber-800",
-    admin:       "bg-red-100 text-red-800",
-    staff:       "bg-blue-100 text-blue-800",
-    customer:    "bg-green-100 text-green-800",
+    super_admin:     "bg-amber-100 text-amber-800",
+    admin:           "bg-red-100 text-red-800",
+    staff:           "bg-blue-100 text-blue-800",
+    delivery_person: "bg-purple-100 text-purple-800",
+    customer:        "bg-green-100 text-green-800",
   };
   const roleLabels: Record<UserRole, string> = {
-    super_admin: "👑 Super Admin",
-    admin:       "🛠️ Admin",
-    staff:       "👷 Staff",
-    customer:    "👤 Customer",
+    super_admin:     "👑 Super Admin",
+    admin:           "🛠️ Admin",
+    staff:           "👷 Staff",
+    delivery_person: "🛵 Delivery Person",
+    customer:        "👤 Customer",
   };
 
   async function handleLogout() {

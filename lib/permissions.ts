@@ -38,12 +38,12 @@ export const PERMISSIONS = {
   // Deliveries
   DELIVERIES_VIEW_ALL:  ["super_admin", "admin"],
   DELIVERIES_ASSIGN:    ["super_admin", "admin"],
-  DELIVERIES_UPDATE:    ["super_admin", "admin", "staff"],
-  DELIVERIES_VIEW_OWN:  ["super_admin", "admin", "staff"],
+  DELIVERIES_UPDATE:    ["super_admin", "admin", "staff", "delivery_person"],
+  DELIVERIES_VIEW_OWN:  ["super_admin", "admin", "staff", "delivery_person"],
 
   // Customers
   CUSTOMERS_VIEW_ALL:   ["super_admin", "admin"],
-  CUSTOMERS_VIEW_LIMITED: ["super_admin", "admin", "staff"],
+  CUSTOMERS_VIEW_LIMITED: ["super_admin", "admin", "staff", "delivery_person"],
   CUSTOMERS_MANAGE:     ["super_admin", "admin"],
   CUSTOMERS_NOTIFY:     ["super_admin", "admin"],
 
@@ -58,10 +58,11 @@ export const PERMISSIONS = {
   SETTINGS_TIME_SLOTS:  ["super_admin", "admin"],
   SETTINGS_TAXES:       ["super_admin"],
   AUDIT_LOGS:           ["super_admin"],
+  SCHEDULE_MANAGE:      ["super_admin", "admin"],
 
   // Payments
   PAYMENTS_VIEW:        ["super_admin", "admin"],
-  PAYMENTS_RECORD:      ["super_admin", "admin", "staff"],
+  PAYMENTS_RECORD:      ["super_admin", "admin", "staff", "delivery_person"],
   PAYMENTS_REFUND:      ["super_admin", "admin"],
 } as const;
 
@@ -85,10 +86,11 @@ export function hasAllPermissions(role: UserRole, permissions: Permission[]): bo
 // ─── Role metadata (for display) ─────────────────────────────────────────────
 
 export const ROLE_META: Record<UserRole, { label: string; color: string; icon: string }> = {
-  super_admin: { label: "Super Admin", color: "amber",  icon: "👑" },
-  admin:       { label: "Admin",       color: "red",    icon: "🛠️" },
-  staff:       { label: "Staff",       color: "blue",   icon: "👷" },
-  customer:    { label: "Customer",    color: "green",  icon: "👤" },
+  super_admin:     { label: "Super Admin",     color: "amber",  icon: "👑" },
+  admin:           { label: "Admin",           color: "red",    icon: "🛠️" },
+  staff:           { label: "Staff",           color: "blue",   icon: "👷" },
+  delivery_person: { label: "Delivery Person", color: "purple", icon: "🛵" },
+  customer:        { label: "Customer",        color: "green",  icon: "👤" },
 };
 
 // ─── Nav items per role ───────────────────────────────────────────────────────
@@ -106,6 +108,7 @@ export const NAV_ITEMS: NavItem[] = [
 
   // Admin + Super Admin only
   { label: "Deliveries",   href: "/deliveries",          icon: "Truck",        permission: "DELIVERIES_VIEW_ALL" },
+  { label: "Schedule",     href: "/schedule",            icon: "CalendarRange",permission: "SCHEDULE_MANAGE" },
   { label: "Customers",    href: "/customers",           icon: "Users",        permission: "CUSTOMERS_VIEW_ALL" },
   { label: "Reports",      href: "/reports",             icon: "BarChart2",    permission: "REPORTS_FINANCIAL" },
   { label: "Settings",     href: "/settings",            icon: "Settings",     permission: "SETTINGS_BUSINESS" },
@@ -117,6 +120,10 @@ export const NAV_ITEMS: NavItem[] = [
 
   // Staff only
   { label: "My Deliveries", href: "/my-deliveries",     icon: "MapPin",       permission: "DELIVERIES_VIEW_OWN" },
+  { label: "My Stops",     href: "/my-stops",            icon: "CalendarRange",permission: "DELIVERIES_VIEW_OWN" },
+
+  // Admin + Super Admin + Staff + Delivery Person (not customer)
+  { label: "Upcoming",     href: "/upcoming-deliveries", icon: "CalendarDays", permission: "DELIVERIES_VIEW_OWN" },
 
   // Customer only
   { label: "Order Water",  href: "/order",               icon: "Plus",         permission: "ORDERS_VIEW_OWN" },
@@ -126,9 +133,11 @@ export const NAV_ITEMS: NavItem[] = [
 // Routes that belong exclusively to customers — never shown to admin/staff
 const CUSTOMER_ONLY_HREFS = ["/order", "/my-orders"];
 // Routes that belong exclusively to staff drivers — never shown to admin/customer
-const STAFF_ONLY_HREFS    = ["/my-deliveries"];
+const STAFF_ONLY_HREFS    = ["/my-deliveries", "/my-stops"];
 // Routes that belong exclusively to admin/super_admin — never shown to staff
-const ADMIN_ONLY_HREFS    = ["/deliveries", "/customers", "/reports", "/settings"];
+const ADMIN_ONLY_HREFS    = ["/deliveries", "/customers", "/reports", "/settings", "/schedule"];
+// Routes visible to delivery_person — a narrow allowlist, not "everything but customer/admin"
+const DELIVERY_PERSON_HREFS = ["/my-deliveries", "/my-stops", "/upcoming-deliveries"];
 
 export function getNavForRole(role: UserRole): NavItem[] {
   const dashboardItem = NAV_ITEMS.find((n) => n.href === "/dashboard")!;
@@ -136,9 +145,14 @@ export function getNavForRole(role: UserRole): NavItem[] {
     (n) => n.permission && hasPermission(role, n.permission)
   );
 
-  // Customers: only see their own order-facing pages
+  // Customers: dashboard + their own order-facing pages
   if (role === "customer") {
-    return roleItems.filter((n) => CUSTOMER_ONLY_HREFS.includes(n.href));
+    return [dashboardItem, ...roleItems.filter((n) => CUSTOMER_ONLY_HREFS.includes(n.href))];
+  }
+
+  // Delivery persons: narrow allowlist only — never the admin/staff back-office pages
+  if (role === "delivery_person") {
+    return [dashboardItem, ...roleItems.filter((n) => DELIVERY_PERSON_HREFS.includes(n.href))];
   }
 
   // Staff: see Orders + Inventory + POS + My Deliveries — not the admin-only pages

@@ -15,9 +15,12 @@ npm install
 
 ## 3. Run the Database Schema
 
+The schema is split across numbered migration files in `supabase/migrations/` — there is no Supabase CLI migration runner in this project, so each file is applied by hand, **in order**, from `001` through the highest number in the folder (28 files as of this writing).
+
 1. In Supabase Dashboard → **SQL Editor** → click **New query**
-2. Paste the entire contents of `supabase/migrations/001_initial_schema.sql`
-3. Click **Run** — you should see "Success"
+2. Paste the entire contents of `supabase/migrations/001_initial_schema.sql` → click **Run** → confirm "Success"
+3. Repeat for every subsequent file in numeric order (`002_...sql`, `003_...sql`, … up to the last one) — **one file per query, never combine files into one paste.** A few files (e.g. `019_add_delivery_person_role.sql`) add a new enum value and must run as their own script for that reason.
+4. If you're setting up a fresh project, just run all of them once, in order. If you're updating an existing project, only run the migration files that are newer than the last one you already applied.
 
 ## 4. Configure Environment Variables
 
@@ -95,16 +98,29 @@ aquaflow/
 - [x] Authentication: login, register, forgot password
 - [x] Role-based middleware (routes protected by role)
 - [x] Dashboard layout: responsive sidebar + header
-- [x] Role-aware dashboards: Admin/Super Admin, Staff, Customer
+- [x] Role-aware dashboards: Admin/Super Admin, Staff, Delivery Person, Customer
 - [x] RBAC permissions helper (40+ permissions)
 - [x] PWA manifest + service worker config
 - [x] Mobile-first CSS design system
 
-## Next Phases
+## Phase 2 — Core Operations
 
-- [ ] Inventory management CRUD
-- [ ] POS interface
-- [ ] Customer order placement (with date/time picker)
-- [ ] Delivery management board
-- [ ] Reports & charts
-- [ ] Settings pages
+- [x] Inventory management CRUD
+- [x] POS interface
+- [x] Customer order placement (with date/time picker)
+- [x] Delivery management board
+- [x] Reports & charts
+- [x] Settings pages
+
+## Phase 3 — Recurring Delivery Scheduling
+
+- [x] `delivery_person` role — a narrower-permission driver alongside `staff` (both remain assignable as drivers everywhere)
+- [x] Admin-managed customer delivery preferences: payment method (cash / monthly account), recurring frequency (weekly, biweekly, or monthly, up to 2 days), and a "standing order" of default items
+- [x] Admin-side address management (add/edit/delete on a customer's behalf), with a delivery zone per address
+- [x] Monthly-scoped weekly zone → driver schedule (`/schedule`) with per-date overrides, whole-week bulk-assign, and automatic carry-forward into a new month
+- [x] Daily materialized delivery stops (`/my-stops`) generated from the recurring schedule — mark delivered (auto-creates the order, applies payment logic, emails the customer) or skipped (notifies admins)
+- [x] Customer credit ledger — accrual/payment history behind the running balance, with an admin settle-payment action
+- [x] Live 7-day upcoming-deliveries preview (`/upcoming-deliveries`)
+- [x] Customer-facing dashboard showing their schedule, address, payment status, unpaid balance, and bottle ledger
+
+See `AquaFlow_User_Manual.md` for the full feature walkthrough by role.

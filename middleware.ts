@@ -11,9 +11,11 @@ const ALWAYS_ALLOWED_ROUTES = ["/reset-password"];
 
 // Routes only customers can access
 const CUSTOMER_ROUTES = ["/order", "/my-orders"];
-// Routes staff/admin/super_admin can access (customers cannot)
-const STAFF_ROUTES    = ["/orders", "/deliveries", "/inventory", "/pos",
-                         "/customers", "/reports", "/settings", "/my-deliveries"];
+// Routes only delivery_person can access (narrow allowlist, not "everything else")
+const DELIVERY_PERSON_ROUTES = ["/my-deliveries", "/my-stops", "/upcoming-deliveries"];
+// Back-office routes: admin/super_admin/staff only — customers and delivery_person are both blocked
+const BACK_OFFICE_ROUTES = ["/orders", "/deliveries", "/inventory", "/pos",
+                            "/customers", "/reports", "/settings", "/schedule"];
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -62,8 +64,7 @@ export async function middleware(request: NextRequest) {
   // ── 2. Public routes ───────────────────────────────────────────────────────
   if (PUBLIC_ROUTES.some((r) => pathname.startsWith(r))) {
     if (user) {
-      const dest = role === "customer" ? "/order" : "/dashboard";
-      return NextResponse.redirect(new URL(dest, request.url));
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     return supabaseResponse;
   }
@@ -71,8 +72,7 @@ export async function middleware(request: NextRequest) {
   // ── 3. Root redirect ───────────────────────────────────────────────────────
   if (pathname === "/") {
     if (!user) return NextResponse.redirect(new URL("/login", request.url));
-    const dest = role === "customer" ? "/order" : "/dashboard";
-    return NextResponse.redirect(new URL(dest, request.url));
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   // ── 4. Require authentication ──────────────────────────────────────────────
@@ -83,15 +83,21 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── 5. Role-based route separation ────────────────────────────────────────
-  const isCustomerRoute = CUSTOMER_ROUTES.some(
-    (p) => pathname === p || pathname.startsWith(p + "/")
-  );
-  const isStaffRoute = STAFF_ROUTES.some(
-    (p) => pathname === p || pathname.startsWith(p + "/")
-  );
+  const matches = (routes: string[]) =>
+    routes.some((p) => pathname === p || pathname.startsWith(p + "/"));
+
+  const isCustomerRoute = matches(CUSTOMER_ROUTES);
+  const isDeliveryPersonRoute = matches(DELIVERY_PERSON_ROUTES);
+  const isBackOfficeRoute = matches(BACK_OFFICE_ROUTES);
 
   if (role === "customer") {
-    if (isStaffRoute) return NextResponse.redirect(new URL("/order", request.url));
+    if (isDeliveryPersonRoute || isBackOfficeRoute) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+  } else if (role === "delivery_person") {
+    if (isCustomerRoute || isBackOfficeRoute) {
+      return NextResponse.redirect(new URL("/my-deliveries", request.url));
+    }
   } else {
     if (isCustomerRoute) return NextResponse.redirect(new URL("/dashboard", request.url));
   }

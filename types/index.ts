@@ -1,6 +1,6 @@
 // ─── User & Auth ─────────────────────────────────────────────────────────────
 
-export type UserRole = "super_admin" | "admin" | "staff" | "customer";
+export type UserRole = "super_admin" | "admin" | "staff" | "delivery_person" | "customer";
 
 export interface Profile {
   id: string;
@@ -108,6 +108,8 @@ export interface CustomerAddress {
   created_at: string;
 }
 
+export type PaymentMethodPreference = "cash" | "monthly";
+
 export interface Customer {
   id: string;              // references profiles.id
   profile?: Profile;
@@ -115,8 +117,35 @@ export interface Customer {
   total_spent: number;
   loyalty_points: number;
   notes: string | null;
+  payment_method_preference: PaymentMethodPreference;
   addresses?: CustomerAddress[];
   created_at: string;
+}
+
+export type DeliveryFrequency = "weekly" | "biweekly" | "monthly";
+
+export interface CustomerDeliveryPreference {
+  id: string;
+  customer_id: string;
+  frequency: DeliveryFrequency;
+  days_of_week: number[];   // 0=Sun..6=Sat; weekly/biweekly, 1-2 entries
+  days_of_month: number[];  // 1-31, clamped to month length; monthly, 1-2 entries
+  biweekly_anchor_date: string | null;
+  address_id: string | null;
+  time_slot_id: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomerStandingItem {
+  id: string;
+  customer_id: string;
+  product_id: string;
+  product?: Product;
+  quantity: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // ─── Delivery Zones & Time Slots ─────────────────────────────────────────────
@@ -126,6 +155,45 @@ export interface DeliveryZone {
   name: string;
   delivery_fee: number;
   is_active: boolean;
+  created_at: string;
+}
+
+// ─── Schedule engine ─────────────────────────────────────────────────────────
+// A schedule_plan is scoped to one calendar month; schedule_plan_days is the
+// day-of-week -> zone -> driver template that repeats every week of that
+// month; schedule_overrides changes a single date without touching the
+// template. See resolve_zone_driver() (022_schedule_engine.sql).
+
+export interface SchedulePlan {
+  id: string;
+  plan_month: string;   // "YYYY-MM-01"
+  name: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SchedulePlanDay {
+  id: string;
+  plan_id: string;
+  day_of_week: number;  // 0=Sun..6=Sat
+  zone_id: string;
+  zone?: DeliveryZone;
+  driver_id: string | null;
+  driver?: Profile;
+  created_at: string;
+}
+
+export interface ScheduleOverride {
+  id: string;
+  override_date: string;
+  zone_id: string;
+  zone?: DeliveryZone;
+  driver_id: string | null;
+  driver?: Profile;
+  is_skipped: boolean;
+  note: string | null;
+  created_by: string;
   created_at: string;
 }
 
@@ -151,7 +219,7 @@ export type OrderStatus =
 
 export type OrderType = "online" | "pos" | "admin";
 
-export type PaymentMethod = "cash" | "card" | "easypaisa" | "jazzcash" | "bank" | "credit";
+export type PaymentMethod = "cash" | "card" | "easypaisa" | "jazzcash" | "bank" | "credit" | "online";
 export type PaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
 
 export interface OrderItem {
@@ -223,6 +291,67 @@ export interface Delivery {
   notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ─── Delivery Stops (materialized daily schedule) ─────────────────────────────
+// A delivery_stop is generated lazily from customer_delivery_preferences +
+// resolve_zone_driver() for a given date. It has no order until marked
+// 'completed' — see completeStop() in app/(dashboard)/my-stops/actions.ts.
+
+export type DeliveryStopStatus = "pending" | "completed" | "skipped";
+
+export interface DeliveryStopItem {
+  id: string;
+  stop_id: string;
+  product_id: string;
+  product?: Product;
+  planned_qty: number;
+  actual_qty: number | null;   // NULL until confirmed; deviation = actual_qty <> planned_qty
+  unit_price: number;
+  created_at: string;
+}
+
+export interface DeliveryStop {
+  id: string;
+  customer_id: string;
+  customer?: Profile;
+  stop_date: string;
+  address_id: string | null;
+  address?: CustomerAddress;
+  zone_id: string | null;
+  zone?: DeliveryZone;
+  driver_id: string | null;
+  driver?: Profile;
+  status: DeliveryStopStatus;
+  payment_method_snapshot: PaymentMethodPreference;
+  order_id: string | null;
+  delivery_id: string | null;
+  cash_collected: boolean | null;
+  skipped_reason: string | null;
+  notes: string | null;
+  completed_at: string | null;
+  completed_by: string | null;
+  created_at: string;
+  updated_at: string;
+  items?: DeliveryStopItem[];
+}
+
+// ─── Customer Credit Ledger ────────────────────────────────────────────────────
+// credit_balance on customers is a running total; this ledger is the auditable
+// trail behind it (both accruals — monthly/unpaid-cash deliveries, POS credit
+// sales — and payments recorded against it).
+
+export type CreditTransactionType = "accrual" | "payment";
+
+export interface CustomerCreditTransaction {
+  id: string;
+  customer_id: string;
+  type: CreditTransactionType;
+  amount: number;
+  related_order_id: string | null;
+  note: string | null;
+  created_by: string;
+  created_at: string;
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

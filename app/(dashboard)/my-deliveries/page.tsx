@@ -13,7 +13,7 @@ export default async function MyDeliveriesPage() {
   const { data: profile } = await supabase
     .from("profiles").select("role").eq("id", session.user.id).single();
 
-  const allowed = ["super_admin", "admin", "staff"];
+  const allowed = ["super_admin", "admin", "staff", "delivery_person"];
   if (!profile || !allowed.includes(profile.role)) redirect("/dashboard");
 
   const today = new Date().toISOString().split("T")[0];

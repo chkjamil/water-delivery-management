@@ -12,7 +12,7 @@ async function requireDriver() {
   const { data: profile } = await supabase
     .from("profiles").select("role").eq("id", user.id).single();
 
-  const allowed = ["super_admin", "admin", "staff"];
+  const allowed = ["super_admin", "admin", "staff", "delivery_person"];
   if (!allowed.includes(profile?.role ?? "")) {
     return { error: "Permission denied", supabase: null, user: null };
   }

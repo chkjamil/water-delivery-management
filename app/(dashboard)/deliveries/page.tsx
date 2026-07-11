@@ -35,7 +35,7 @@ export default async function DeliveriesPage() {
     supabase
       .from("profiles")
       .select("id, full_name, phone")
-      .eq("role", "staff")
+      .in("role", ["staff", "delivery_person"])
       .eq("is_active", true)
       .order("full_name"),
   ]);

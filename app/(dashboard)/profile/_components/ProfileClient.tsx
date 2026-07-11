@@ -163,9 +163,14 @@ export default function ProfileClient({ profile: initial, addresses: initialAddr
   }
 
   // ── Delete address ──────────────────────────────────────────────────────────
+  // No client-side minimum-address/schedule-linked check here — the DB trigger
+  // (027_protect_customer_addresses.sql) is the source of truth and rejects
+  // both cases with a clear message, so we just surface whatever it says.
   async function deleteAddress(id: string) {
     if (!confirm("Remove this address?")) return;
-    await supabase.from("customer_addresses").delete().eq("id", id);
+    setAddrMsg("");
+    const { error } = await supabase.from("customer_addresses").delete().eq("id", id);
+    if (error) { setAddrMsg(error.message); return; }
     setAddresses((prev) => prev.filter((a) => a.id !== id));
   }
 
@@ -338,6 +343,7 @@ export default function ProfileClient({ profile: initial, addresses: initialAddr
       {/* ── Tab: Addresses ─────────────────────────────────────────────────── */}
       {tab === "addresses" && (
         <div className="space-y-3">
+          {addrMsg && !showAddAddr && <p className="text-sm text-red-600">{addrMsg}</p>}
           {addresses.length === 0 && !showAddAddr && (
             <div className="card p-12 text-center">
               <div className="text-4xl mb-3">📍</div>

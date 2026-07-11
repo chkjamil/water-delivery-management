@@ -10,17 +10,19 @@ import { clsx } from "clsx";
 import { format } from "date-fns";
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
-  { value: "super_admin", label: "👑 Super Admin" },
-  { value: "admin",       label: "🛠️ Admin"       },
-  { value: "staff",       label: "👷 Staff"        },
-  { value: "customer",    label: "👤 Customer"     },
+  { value: "super_admin",     label: "👑 Super Admin"     },
+  { value: "admin",           label: "🛠️ Admin"           },
+  { value: "staff",           label: "👷 Staff"            },
+  { value: "delivery_person", label: "🛵 Delivery Person" },
+  { value: "customer",        label: "👤 Customer"        },
 ];
 
 const ROLE_COLORS: Record<UserRole, string> = {
-  super_admin: "bg-amber-100 text-amber-800",
-  admin:       "bg-red-100 text-red-800",
-  staff:       "bg-blue-100 text-blue-800",
-  customer:    "bg-green-100 text-green-800",
+  super_admin:     "bg-amber-100 text-amber-800",
+  admin:           "bg-red-100 text-red-800",
+  staff:           "bg-blue-100 text-blue-800",
+  delivery_person: "bg-purple-100 text-purple-800",
+  customer:        "bg-green-100 text-green-800",
 };
 
 const DEFAULT_FORM = { email: "", password: "", full_name: "", phone: "", role: "staff" as UserRole };
@@ -96,11 +98,12 @@ export default function UsersClient({
   }
 
   const counts = {
-    all:         users.length,
-    super_admin: users.filter(u => u.role === "super_admin").length,
-    admin:       users.filter(u => u.role === "admin").length,
-    staff:       users.filter(u => u.role === "staff").length,
-    customer:    users.filter(u => u.role === "customer").length,
+    all:             users.length,
+    super_admin:     users.filter(u => u.role === "super_admin").length,
+    admin:           users.filter(u => u.role === "admin").length,
+    staff:           users.filter(u => u.role === "staff").length,
+    delivery_person: users.filter(u => u.role === "delivery_person").length,
+    customer:        users.filter(u => u.role === "customer").length,
   };
 
   return (
@@ -125,7 +128,7 @@ export default function UsersClient({
               value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="flex gap-1 flex-wrap">
-            {(["all", "super_admin", "admin", "staff", "customer"] as const).map((r) => (
+            {(["all", "super_admin", "admin", "staff", "delivery_person", "customer"] as const).map((r) => (
               <button key={r} onClick={() => setFilter(r)}
                 className={clsx("px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
                   filter === r ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}>
