@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, MapPin, Clock, User, CreditCard, Package, Printer } from "lucide-react";
+import { ArrowLeft, MapPin, Clock, User, CreditCard, Package, Printer, Camera, AlertTriangle } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import UpdateStatusModal from "./UpdateStatusModal";
 import RecordPaymentModal from "./RecordPaymentModal";
@@ -35,6 +35,10 @@ export type OrderDetail = OrderRow & {
     delivered_at: string | null;
     failed_reason: string | null;
     empty_bottles_collected: number;
+    proof_lat: number | null;
+    proof_lng: number | null;
+    proof_photo_url: string | null;
+    location_available: boolean;
     driver: { full_name: string; phone: string | null } | null;
   } | null;
 };
@@ -209,6 +213,34 @@ export default function OrderDetailClient({ order: initial, canEdit }: Props) {
             )}
             {order.delivery.empty_bottles_collected > 0 && (
               <p className="text-xs text-slate-500 mt-1">Bottles collected: {order.delivery.empty_bottles_collected}</p>
+            )}
+          </div>
+        )}
+
+        {/* Delivery proof */}
+        {order.delivery?.status === "delivered" && (order.delivery.proof_photo_url || !order.delivery.location_available) && (
+          <div className="card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Camera size={14} className="text-slate-400" />
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Delivery Proof</p>
+            </div>
+            {!order.delivery.location_available && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 flex items-center gap-1.5 mb-2">
+                <AlertTriangle size={13} className="flex-shrink-0" /> Location unavailable at time of delivery — unverified
+              </p>
+            )}
+            {order.delivery.proof_photo_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={order.delivery.proof_photo_url} alt="Delivery proof" className="rounded-lg w-full max-h-64 object-cover mb-2" />
+            )}
+            {order.delivery.proof_lat != null && order.delivery.proof_lng != null && (
+              <a
+                href={`https://www.google.com/maps?q=${order.delivery.proof_lat},${order.delivery.proof_lng}`}
+                target="_blank" rel="noopener noreferrer"
+                className="text-xs text-brand-600 hover:underline inline-flex items-center gap-1"
+              >
+                <MapPin size={12} /> View location on map
+              </a>
             )}
           </div>
         )}

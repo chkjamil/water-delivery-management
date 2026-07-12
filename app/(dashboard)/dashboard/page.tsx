@@ -1,9 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import type { UserRole } from "@/types";
 import AdminDashboard from "./_components/AdminDashboard";
 import StaffDashboard from "./_components/StaffDashboard";
 import CustomerDashboard from "./_components/CustomerDashboard";
+import { ensureStopsGenerated } from "../my-stops/actions";
+import { getUpcomingProjection } from "../upcoming-deliveries/actions";
 
 export default async function DashboardPage() {
   // createClient() is async in Next.js 15
@@ -92,18 +95,47 @@ export default async function DashboardPage() {
   }
 
   if (role === "staff" || role === "delivery_person") {
-    const { data: myDeliveries } = await supabase
-      .from("deliveries")
-      .select("id, status, order:orders(order_number, delivery_date, address:customer_addresses(address_line1, city))")
-      .eq("driver_id", user.id)
-      .in("status", ["assigned", "loaded", "en_route"])
-      .limit(10);
+    const today = new Date().toISOString().split("T")[0];
 
-    return <StaffDashboard deliveries={myDeliveries || []} fullName={profile?.full_name || ""} />;
+    // Same lazy-generation as /my-stops — makes sure today's recurring stops
+    // exist before we try to show them here too.
+    await ensureStopsGenerated(today);
+
+    const [{ data: myDeliveries }, { data: myStopsRaw }, { upcoming }] = await Promise.all([
+      supabase
+        .from("deliveries")
+        .select("id, status, order:orders(order_number, delivery_date, address:customer_addresses(address_line1, city))")
+        .eq("driver_id", user.id)
+        .in("status", ["assigned", "loaded", "en_route"])
+        .limit(10),
+      supabase
+        .from("delivery_stops")
+        .select("id, status, customer:profiles!delivery_stops_customer_id_fkey(full_name), address:customer_addresses(address_line1, city)")
+        .eq("driver_id", user.id)
+        .eq("stop_date", today)
+        .order("status"),
+      getUpcomingProjection(4),
+    ]);
+
+    const myStops = (myStopsRaw ?? []).map((s: any) => ({
+      ...s,
+      customer: Array.isArray(s.customer) ? (s.customer[0] ?? null) : s.customer,
+      address: Array.isArray(s.address) ? (s.address[0] ?? null) : s.address,
+    }));
+
+    return (
+      <StaffDashboard
+        deliveries={myDeliveries || []}
+        stops={myStops}
+        upcoming={upcoming.filter((d) => d.date !== today)}
+        fullName={profile?.full_name || ""}
+        role={role}
+      />
+    );
   }
 
   // Customer
-  const [{ data: myOrders }, { data: deliveryPreference }, { data: addresses }, { data: customerRow }, { data: bottles }] = await Promise.all([
+  const [{ data: myOrders }, { data: deliveryPreference }, { data: addresses }, { data: customerRow }, { data: bottles }, { data: creditTransactionsRaw }] = await Promise.all([
     supabase
       .from("orders")
       .select("id, order_number, status, payment_status, total_amount, delivery_date, created_at")
@@ -129,7 +161,25 @@ export default async function DashboardPage() {
       .from("customer_bottles")
       .select("quantity_owned, product:products(name, size_label)")
       .eq("customer_id", user.id),
+    supabase
+      .from("customer_credit_transactions")
+      .select("id, type, amount, note, evidence_path, created_at")
+      .eq("customer_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(10),
   ]);
+
+  // Evidence lives in a private bucket — resolve signed URLs here. Scoping is
+  // already correct: this query only ever returns the logged-in customer's own rows.
+  const creditTransactions = await Promise.all(
+    (creditTransactionsRaw ?? []).map(async (t) => {
+      if (!t.evidence_path) return { ...t, evidence_url: null };
+      const { data: signed } = await createAdminClient()
+        .storage.from("payment-evidence")
+        .createSignedUrl(t.evidence_path, 60 * 10);
+      return { ...t, evidence_url: signed?.signedUrl ?? null };
+    })
+  );
 
   return (
     <CustomerDashboard
@@ -143,6 +193,7 @@ export default async function DashboardPage() {
         quantity_owned: b.quantity_owned,
         product: Array.isArray(b.product) ? (b.product[0] ?? null) : b.product,
       }))}
+      creditTransactions={creditTransactions}
     />
   );
 }

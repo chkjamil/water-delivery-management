@@ -8,7 +8,7 @@ import {
   getOrCreatePlan, upsertPlanDay, deletePlanDay, copyPlanToNextMonth,
   upsertOverride, deleteOverride,
 } from "../actions";
-import type { DeliveryZone, SchedulePlan, SchedulePlanDay, ScheduleOverride } from "@/types";
+import type { DeliveryZone, SchedulePlan, SchedulePlanDay, ScheduleOverride, TimeSlot } from "@/types";
 
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -27,7 +27,7 @@ function shiftMonth(planMonth: string, delta: number) {
 }
 
 export default function ScheduleClient({
-  planMonth, initialPlan, initialPlanDays, initialOverrides, zones, drivers,
+  planMonth, initialPlan, initialPlanDays, initialOverrides, zones, drivers, timeSlots,
 }: {
   planMonth: string;
   initialPlan: SchedulePlan | null;
@@ -35,16 +35,23 @@ export default function ScheduleClient({
   initialOverrides: ScheduleOverride[];
   zones: DeliveryZone[];
   drivers: DriverOption[];
+  timeSlots: TimeSlot[];
 }) {
   const router = useRouter();
   const [plan, setPlan]           = useState(initialPlan);
   const [planDays, setPlanDays]   = useState(initialPlanDays);
   const [overrides, setOverrides] = useState(initialOverrides);
   const [isPending, start]        = useTransition();
-  const [overrideForm, setOverrideForm] = useState({ date: "", zone_id: "", driver_id: "", is_skipped: false });
+  const [overrideForm, setOverrideForm] = useState({ date: "", zone_id: "", driver_id: "", time_slot_id: "", is_skipped: false });
+  const [bulkForm, setBulkForm]   = useState<Record<string, { driver_id: string; time_slot_id: string }>>({});
 
   const locked = isPastMonth(planMonth);
   const monthLabel = new Date(planMonth + "T00:00:00Z").toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+
+  function timeSlotLabel(id: string | null) {
+    if (!id) return null;
+    return timeSlots.find((t) => t.id === id)?.label ?? null;
+  }
 
   function goToMonth(m: string) {
     router.push(`/schedule?month=${m}`);
@@ -64,15 +71,15 @@ export default function ScheduleClient({
     });
   }
 
-  function cellDriver(zoneId: string, dow: number): string {
-    return planDays.find((d) => d.zone_id === zoneId && d.day_of_week === dow)?.driver_id ?? "";
+  function cellDay(zoneId: string, dow: number) {
+    return planDays.find((d) => d.zone_id === zoneId && d.day_of_week === dow);
   }
 
-  function handleCellChange(zoneId: string, dow: number, driverId: string) {
+  function handleCellUpdate(zoneId: string, dow: number, driverId: string | null, timeSlotId: string | null) {
     if (!plan) return;
     start(async () => {
       if (!driverId) {
-        const existing = planDays.find((d) => d.zone_id === zoneId && d.day_of_week === dow);
+        const existing = cellDay(zoneId, dow);
         if (existing) {
           const result = await deletePlanDay(existing.id);
           if (result.error) { toast.error(result.error); return; }
@@ -80,7 +87,7 @@ export default function ScheduleClient({
         }
         return;
       }
-      const result = await upsertPlanDay(plan.id, dow, zoneId, driverId);
+      const result = await upsertPlanDay(plan.id, dow, zoneId, driverId, timeSlotId);
       if (result.error) { toast.error(result.error); return; }
       setPlanDays((prev) => {
         const without = prev.filter((d) => !(d.zone_id === zoneId && d.day_of_week === dow));
@@ -89,11 +96,23 @@ export default function ScheduleClient({
     });
   }
 
-  function handleBulkAssign(zoneId: string, driverId: string) {
-    if (!plan || !driverId) return;
+  function handleDriverChange(zoneId: string, dow: number, driverId: string) {
+    const currentSlot = cellDay(zoneId, dow)?.time_slot_id ?? null;
+    handleCellUpdate(zoneId, dow, driverId || null, currentSlot);
+  }
+
+  function handleSlotChange(zoneId: string, dow: number, timeSlotId: string) {
+    const currentDriver = cellDay(zoneId, dow)?.driver_id ?? null;
+    handleCellUpdate(zoneId, dow, currentDriver, timeSlotId || null);
+  }
+
+  function handleBulkAssign(zoneId: string) {
+    if (!plan) return;
+    const { driver_id, time_slot_id } = bulkForm[zoneId] ?? { driver_id: "", time_slot_id: "" };
+    if (!driver_id) { toast.error("Pick a driver first"); return; }
     start(async () => {
       const results = await Promise.all(
-        DOW_LABELS.map((_, dow) => upsertPlanDay(plan.id, dow, zoneId, driverId))
+        DOW_LABELS.map((_, dow) => upsertPlanDay(plan.id, dow, zoneId, driver_id, time_slot_id || null))
       );
       const failed = results.find((r) => r.error);
       if (failed) { toast.error(failed.error!); return; }
@@ -102,7 +121,7 @@ export default function ScheduleClient({
         const newDays = results.map((r) => r.planDay!);
         return [...withoutZone, ...newDays];
       });
-      toast.success("Driver set for the whole week");
+      toast.success("Set for the whole week");
     });
   }
 
@@ -121,11 +140,12 @@ export default function ScheduleClient({
     start(async () => {
       const result = await upsertOverride(overrideForm.date, overrideForm.zone_id, {
         driverId: overrideForm.is_skipped ? null : (overrideForm.driver_id || null),
+        timeSlotId: overrideForm.is_skipped ? null : (overrideForm.time_slot_id || null),
         isSkipped: overrideForm.is_skipped,
       });
       if (result.error) { toast.error(result.error); return; }
       setOverrides((prev) => [...prev.filter((o) => o.id !== result.override!.id), result.override!]);
-      setOverrideForm({ date: "", zone_id: "", driver_id: "", is_skipped: false });
+      setOverrideForm({ date: "", zone_id: "", driver_id: "", time_slot_id: "", is_skipped: false });
       toast.success("Override saved");
     });
   }
@@ -182,36 +202,71 @@ export default function ScheduleClient({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {zones.map((zone) => (
-                    <tr key={zone.id}>
-                      <td className="px-3 py-2 font-medium text-slate-700 whitespace-nowrap">{zone.name}</td>
-                      <td className="px-2 py-2">
-                        <select
-                          className="input text-xs py-1.5"
-                          value=""
-                          disabled={locked || isPending}
-                          onChange={(e) => { if (e.target.value) handleBulkAssign(zone.id, e.target.value); }}
-                          title="Assign one driver to all 7 days for this zone"
-                        >
-                          <option value="">Set all…</option>
-                          {drivers.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-                        </select>
-                      </td>
-                      {DOW_LABELS.map((_, dow) => (
-                        <td key={dow} className="px-2 py-2">
-                          <select
-                            className="input text-xs py-1.5"
-                            value={cellDriver(zone.id, dow)}
-                            disabled={locked || isPending}
-                            onChange={(e) => handleCellChange(zone.id, dow, e.target.value)}
-                          >
-                            <option value="">—</option>
-                            {drivers.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-                          </select>
+                  {zones.map((zone) => {
+                    const bulk = bulkForm[zone.id] ?? { driver_id: "", time_slot_id: "" };
+                    return (
+                      <tr key={zone.id}>
+                        <td className="px-3 py-2 font-medium text-slate-700 whitespace-nowrap align-top">{zone.name}</td>
+                        <td className="px-2 py-2 align-top">
+                          <div className="flex flex-col gap-1 min-w-[130px]">
+                            <select
+                              className="input text-xs py-1"
+                              value={bulk.driver_id}
+                              disabled={locked || isPending}
+                              onChange={(e) => setBulkForm((f) => ({ ...f, [zone.id]: { ...bulk, driver_id: e.target.value } }))}
+                            >
+                              <option value="">Driver…</option>
+                              {drivers.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+                            </select>
+                            <select
+                              className="input text-xs py-1"
+                              value={bulk.time_slot_id}
+                              disabled={locked || isPending}
+                              onChange={(e) => setBulkForm((f) => ({ ...f, [zone.id]: { ...bulk, time_slot_id: e.target.value } }))}
+                            >
+                              <option value="">Slot…</option>
+                              {timeSlots.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                            </select>
+                            <button
+                              type="button" onClick={() => handleBulkAssign(zone.id)}
+                              disabled={locked || isPending} className="btn-secondary text-xs py-1"
+                              title="Apply to all 7 days for this zone"
+                            >
+                              Set week
+                            </button>
+                          </div>
                         </td>
-                      ))}
-                    </tr>
-                  ))}
+                        {DOW_LABELS.map((_, dow) => {
+                          const day = cellDay(zone.id, dow);
+                          return (
+                            <td key={dow} className="px-2 py-2 align-top">
+                              <div className="flex flex-col gap-1 min-w-[110px]">
+                                <select
+                                  className="input text-xs py-1"
+                                  value={day?.driver_id ?? ""}
+                                  disabled={locked || isPending}
+                                  onChange={(e) => handleDriverChange(zone.id, dow, e.target.value)}
+                                >
+                                  <option value="">—</option>
+                                  {drivers.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+                                </select>
+                                <select
+                                  className="input text-xs py-1"
+                                  value={day?.time_slot_id ?? ""}
+                                  disabled={locked || isPending || !day?.driver_id}
+                                  onChange={(e) => handleSlotChange(zone.id, dow, e.target.value)}
+                                  title={!day?.driver_id ? "Pick a driver first" : undefined}
+                                >
+                                  <option value="">Slot…</option>
+                                  {timeSlots.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                                </select>
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
                   {zones.length === 0 && (
                     <tr><td colSpan={9} className="px-3 py-6 text-center text-slate-400 text-sm">No active delivery zones. Add zones in Settings first.</td></tr>
                   )}
@@ -253,6 +308,14 @@ export default function ScheduleClient({
               {drivers.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
             </select>
           </div>
+          <div>
+            <label className="label">Time Slot</label>
+            <select className="input" value={overrideForm.time_slot_id} disabled={overrideForm.is_skipped}
+              onChange={(e) => setOverrideForm((f) => ({ ...f, time_slot_id: e.target.value }))}>
+              <option value="">— None —</option>
+              {timeSlots.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+          </div>
           <label className="flex items-center gap-1.5 text-sm text-slate-600 pb-2">
             <input type="checkbox" checked={overrideForm.is_skipped}
               onChange={(e) => setOverrideForm((f) => ({ ...f, is_skipped: e.target.checked }))} />
@@ -275,7 +338,12 @@ export default function ScheduleClient({
                   {o.is_skipped ? (
                     <span className="text-red-600 inline-flex items-center gap-1"><Ban size={12} /> Skipped</span>
                   ) : (
-                    drivers.find((d) => d.id === o.driver_id)?.full_name ?? "Unassigned"
+                    <>
+                      {drivers.find((d) => d.id === o.driver_id)?.full_name ?? "Unassigned"}
+                      {timeSlotLabel(o.time_slot_id ?? null) && (
+                        <span className="text-slate-400"> · {timeSlotLabel(o.time_slot_id ?? null)}</span>
+                      )}
+                    </>
                   )}
                 </span>
                 <button onClick={() => handleDeleteOverride(o.id)} className="btn-ghost btn-sm p-1.5 text-red-500 hover:bg-red-50">

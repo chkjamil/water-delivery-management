@@ -43,6 +43,7 @@ export async function ensureStopsGenerated(date: string) {
         address_id: d.address_id,
         zone_id: d.zone_id,
         driver_id: d.driver_id,
+        time_slot_id: d.time_slot_id,
         payment_method_snapshot: d.payment_method_snapshot,
       })),
       { onConflict: "customer_id,stop_date", ignoreDuplicates: true }
@@ -78,20 +79,51 @@ export async function ensureStopsGenerated(date: string) {
   });
 
   if (itemRows.length > 0) {
-    const { error: itemsErr } = await admin.from("delivery_stop_items").insert(itemRows);
+    // Upsert with ignoreDuplicates, not a plain insert: two concurrent calls to
+    // this function (e.g. two devices opening /my-stops around the same time)
+    // can both pass the "stopsWithItems" check above before either commits —
+    // the DB-level UNIQUE(stop_id, product_id) constraint is the real guard,
+    // this just makes the losing call a no-op instead of an error.
+    const { error: itemsErr } = await admin
+      .from("delivery_stop_items")
+      .upsert(itemRows, { onConflict: "stop_id,product_id", ignoreDuplicates: true });
     if (itemsErr) return { error: itemsErr.message };
   }
 
   return { error: null };
 }
 
+// ─── Delivery proof: upload photo, return the storage path ────────────────────
+// Shared upload pattern (also used by my-deliveries/actions.ts): upload goes
+// through the service-role client so no Storage RLS policies are needed —
+// authorization is already enforced by requireDriverOrDeliveryPerson() above.
+
+async function uploadDeliveryProofPhoto(admin: ReturnType<typeof createAdminClient>, ownerId: string, photo: File) {
+  const ext = photo.name?.includes(".") ? photo.name.split(".").pop() : "jpg";
+  const path = `${ownerId}-${Date.now()}.${ext}`;
+  const buffer = await photo.arrayBuffer();
+  const { error } = await admin.storage.from("delivery-proofs").upload(path, buffer, {
+    contentType: photo.type || "image/jpeg",
+  });
+  if (error) return { path: null, error: error.message };
+  return { path, error: null };
+}
+
 // ─── Complete a stop: creates the order/delivery, applies payment logic ──────
 
 export interface CompleteStopItemInput { product_id: string; actual_qty: number; }
 
+export interface DeliveryProofInput {
+  photo?: File;
+  lat?: number;
+  lng?: number;
+  accuracy?: number;
+  locationAvailable: boolean;
+}
+
 export async function completeStop(
   stopId: string,
-  opts: { items: CompleteStopItemInput[]; cashCollected?: boolean }
+  opts: { items: CompleteStopItemInput[]; cashCollected?: boolean; proof?: DeliveryProofInput }
 ) {
   const { error, supabase, user } = await requireDriverOrDeliveryPerson();
   if (error || !supabase || !user) return { error };
@@ -107,10 +139,17 @@ export async function completeStop(
 
   const admin = createAdminClient();
 
+  let proofPhotoPath: string | null = null;
+  if (opts.proof?.photo) {
+    const uploaded = await uploadDeliveryProofPhoto(admin, stopId, opts.proof.photo);
+    if (uploaded.error) return { error: uploaded.error };
+    proofPhotoPath = uploaded.path;
+  }
+
   const { data: fullStop } = await admin
     .from("delivery_stops")
     .select(`
-      id, customer_id, address_id, zone_id, driver_id, payment_method_snapshot, stop_date,
+      id, customer_id, address_id, zone_id, driver_id, time_slot_id, payment_method_snapshot, stop_date,
       customer:profiles!delivery_stops_customer_id_fkey(email, full_name),
       driver:profiles!delivery_stops_driver_id_fkey(full_name),
       zone:delivery_zones(delivery_fee)
@@ -173,6 +212,7 @@ export async function completeStop(
       order_type: "admin",
       status: "delivered",
       delivery_date: fullStop.stop_date,
+      time_slot_id: fullStop.time_slot_id,
       delivery_fee: zone?.delivery_fee ?? 0,
       payment_method: isMonthly ? "credit" : "cash",
       payment_status: isMonthly || !cashCollected ? "unpaid" : "paid",
@@ -207,11 +247,21 @@ export async function completeStop(
     });
   }
 
+  const proofFields = {
+    proof_lat: opts.proof?.lat ?? null,
+    proof_lng: opts.proof?.lng ?? null,
+    proof_accuracy: opts.proof?.accuracy ?? null,
+    proof_captured_at: new Date().toISOString(),
+    proof_photo_path: proofPhotoPath,
+    location_available: opts.proof?.locationAvailable ?? false,
+  };
+
   const { data: delivery } = await admin
     .from("deliveries").select("id").eq("order_id", order.id).single();
   if (delivery) {
     await admin.from("deliveries").update({
       driver_id: fullStop.driver_id, status: "delivered", delivered_at: new Date().toISOString(),
+      ...proofFields,
     }).eq("id", delivery.id);
   }
 
@@ -219,10 +269,16 @@ export async function completeStop(
     status: "completed", order_id: order.id, delivery_id: delivery?.id ?? null,
     cash_collected: isMonthly ? null : cashCollected,
     completed_at: new Date().toISOString(), completed_by: user.id,
+    ...proofFields,
   }).eq("id", stopId);
 
   if (customer?.email) {
     try {
+      const { data: emailItems } = await admin
+        .from("order_items")
+        .select("quantity, unit_price, product:products(name)")
+        .eq("order_id", order.id);
+
       await sendDeliveryUpdate({
         to: customer.email,
         customerName: customer.full_name,
@@ -231,6 +287,11 @@ export async function completeStop(
         driverName: driver?.full_name ?? "Our team",
         deliveryDate: order.delivery_date ?? "",
         timeSlot: "",
+        items: (emailItems ?? []).map((i: any) => ({
+          name: (Array.isArray(i.product) ? i.product[0]?.name : i.product?.name) ?? "Item",
+          quantity: i.quantity,
+          unitPrice: i.unit_price,
+        })),
       });
     } catch {}
   }

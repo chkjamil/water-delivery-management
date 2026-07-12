@@ -342,19 +342,36 @@ export async function upsertDeliveryPreference(customerId: string, input: Delive
 // 'credit' flow, and now also delivery completion for monthly/unpaid-cash
 // accrual). This records a payment against it with an auditable trail.
 
-export async function recordCreditPayment(customerId: string, amount: number, note?: string) {
+export async function recordCreditPayment(
+  customerId: string, amount: number, note?: string, evidence?: File
+) {
   const { error, supabase, user } = await requireAdminAccess();
   if (error || !supabase || !user) return { error };
 
   if (amount <= 0) return { error: "Amount must be greater than 0" };
 
-  const { error: err } = await supabase.rpc("record_credit_payment", {
+  let evidencePath: string | null = null;
+  if (evidence && evidence.size > 0) {
+    const admin = getAdminSupabase();
+    const ext = evidence.name?.includes(".") ? evidence.name.split(".").pop() : "jpg";
+    const path = `${customerId}-${Date.now()}.${ext}`;
+    const buffer = await evidence.arrayBuffer();
+    const { error: uploadErr } = await admin.storage.from("payment-evidence").upload(path, buffer, {
+      contentType: evidence.type || "image/jpeg",
+    });
+    if (uploadErr) return { error: uploadErr.message };
+    evidencePath = path;
+  }
+
+  const { data: transaction, error: err } = await supabase.rpc("record_credit_payment", {
     p_customer_id: customerId, p_amount: amount, p_note: note ?? null, p_created_by: user.id,
+    p_evidence_path: evidencePath,
   });
 
   if (err) return { error: err.message };
   revalidatePath(`/customers/${customerId}`);
-  return { error: null };
+  revalidatePath("/dashboard");
+  return { error: null, transaction };
 }
 
 // ─── Standing items ("usual order") ───────────────────────────────────────────

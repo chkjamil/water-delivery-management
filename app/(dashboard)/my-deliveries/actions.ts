@@ -1,8 +1,24 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { sendDeliveryUpdate } from "@/lib/email";
+
+// Shared upload pattern (also used by my-stops/actions.ts): goes through the
+// service-role client so no Storage RLS policies are needed — authorization
+// is already enforced by requireDriver()/assertDriverOwns() below.
+async function uploadDeliveryProofPhoto(ownerId: string, photo: File) {
+  const admin = createAdminClient();
+  const ext = photo.name?.includes(".") ? photo.name.split(".").pop() : "jpg";
+  const path = `${ownerId}-${Date.now()}.${ext}`;
+  const buffer = await photo.arrayBuffer();
+  const { error } = await admin.storage.from("delivery-proofs").upload(path, buffer, {
+    contentType: photo.type || "image/jpeg",
+  });
+  if (error) return { path: null, error: error.message };
+  return { path, error: null };
+}
 
 async function requireDriver() {
   const supabase = await createClient();
@@ -68,12 +84,27 @@ export async function goEnRoute(deliveryId: string) {
   return { error: null };
 }
 
-export async function markDelivered(deliveryId: string, bottlesCollected: number) {
+export interface DeliveryProofInput {
+  photo?: File;
+  lat?: number;
+  lng?: number;
+  accuracy?: number;
+  locationAvailable: boolean;
+}
+
+export async function markDelivered(deliveryId: string, bottlesCollected: number, proof?: DeliveryProofInput) {
   const { error, supabase, user } = await requireDriver();
   if (error || !supabase || !user) return { error };
 
   const owns = await assertDriverOwns(supabase, deliveryId, user.id);
   if (!owns) return { error: "Not your delivery" };
+
+  let proofPhotoPath: string | null = null;
+  if (proof?.photo) {
+    const uploaded = await uploadDeliveryProofPhoto(deliveryId, proof.photo);
+    if (uploaded.error) return { error: uploaded.error };
+    proofPhotoPath = uploaded.path;
+  }
 
   const now = new Date().toISOString();
   const { error: updateErr } = await supabase
@@ -83,6 +114,12 @@ export async function markDelivered(deliveryId: string, bottlesCollected: number
       delivered_at: now,
       empty_bottles_collected: bottlesCollected,
       updated_at: now,
+      proof_lat: proof?.lat ?? null,
+      proof_lng: proof?.lng ?? null,
+      proof_accuracy: proof?.accuracy ?? null,
+      proof_captured_at: now,
+      proof_photo_path: proofPhotoPath,
+      location_available: proof?.locationAvailable ?? false,
     })
     .eq("id", deliveryId);
 

@@ -43,7 +43,7 @@ async function cloneDaysToNewPlan(
 ) {
   const { data: sourceDays } = await supabase
     .from("schedule_plan_days")
-    .select("day_of_week, zone_id, driver_id")
+    .select("day_of_week, zone_id, driver_id, time_slot_id")
     .eq("plan_id", sourcePlanId);
 
   if (!sourceDays || sourceDays.length === 0) return { error: null, days: [] };
@@ -83,7 +83,7 @@ export async function getOrCreatePlan(planMonth: string) {
     .from("schedule_plans").select("id").eq("plan_month", prevMonth).maybeSingle();
 
   let clonedFromPrevious = false;
-  let planDays: { day_of_week: number; zone_id: string; driver_id: string | null }[] = [];
+  let planDays: { day_of_week: number; zone_id: string; driver_id: string | null; time_slot_id: string | null }[] = [];
   if (prevPlan) {
     const cloneResult = await cloneDaysToNewPlan(supabase, prevPlan.id, created.id);
     if (cloneResult.error) return { error: cloneResult.error, plan: null, planDays: [], clonedFromPrevious: false };
@@ -97,7 +97,10 @@ export async function getOrCreatePlan(planMonth: string) {
 
 // ─── Plan days (weekly template) ───────────────────────────────────────────────
 
-export async function upsertPlanDay(planId: string, dayOfWeek: number, zoneId: string, driverId: string | null) {
+export async function upsertPlanDay(
+  planId: string, dayOfWeek: number, zoneId: string,
+  driverId: string | null, timeSlotId: string | null
+) {
   const { error, supabase } = await requireScheduleAdmin();
   if (error || !supabase) return { error };
 
@@ -107,7 +110,7 @@ export async function upsertPlanDay(planId: string, dayOfWeek: number, zoneId: s
   const { data, error: err } = await supabase
     .from("schedule_plan_days")
     .upsert(
-      { plan_id: planId, day_of_week: dayOfWeek, zone_id: zoneId, driver_id: driverId },
+      { plan_id: planId, day_of_week: dayOfWeek, zone_id: zoneId, driver_id: driverId, time_slot_id: timeSlotId },
       { onConflict: "plan_id,day_of_week,zone_id" }
     )
     .select()
@@ -172,7 +175,7 @@ export async function copyPlanToNextMonth(sourcePlanId: string) {
 
 export async function upsertOverride(
   date: string, zoneId: string,
-  opts: { driverId?: string | null; isSkipped?: boolean; note?: string }
+  opts: { driverId?: string | null; timeSlotId?: string | null; isSkipped?: boolean; note?: string }
 ) {
   const { error, supabase, user } = await requireScheduleAdmin();
   if (error || !supabase || !user) return { error };
@@ -185,7 +188,8 @@ export async function upsertOverride(
     .upsert(
       {
         override_date: date, zone_id: zoneId,
-        driver_id: opts.driverId ?? null, is_skipped: opts.isSkipped ?? false,
+        driver_id: opts.driverId ?? null, time_slot_id: opts.timeSlotId ?? null,
+        is_skipped: opts.isSkipped ?? false,
         note: opts.note ?? null, created_by: user.id,
       },
       { onConflict: "override_date,zone_id" }

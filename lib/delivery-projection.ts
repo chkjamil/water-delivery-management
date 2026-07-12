@@ -24,6 +24,7 @@ export interface ProjectedStop {
   address_id: string | null;
   zone_id: string | null;
   driver_id: string | null;
+  time_slot_id: string | null;
   payment_method_snapshot: "cash" | "monthly";
   items: ProjectedStopItem[];
 }
@@ -98,22 +99,25 @@ export async function computeDueCustomers(
     const addr = pref.address_id ? explicitAddrMap.get(pref.address_id) : defaultAddrMap.get(pref.customer_id);
     if (addr?.zone_id) zoneIds.add(addr.zone_id);
   }
-  const zoneDriverEntries = await Promise.all(
+  const zoneAssignmentEntries = await Promise.all(
     Array.from(zoneIds).map(async (zoneId) => {
-      const { data } = await supabase.rpc("resolve_zone_driver", { p_date: date, p_zone_id: zoneId });
-      return [zoneId, (data as string | null) ?? null] as const;
+      const { data } = await supabase.rpc("resolve_zone_assignment", { p_date: date, p_zone_id: zoneId });
+      const row = (Array.isArray(data) ? data[0] : data) as { driver_id: string | null; time_slot_id: string | null } | null;
+      return [zoneId, { driverId: row?.driver_id ?? null, timeSlotId: row?.time_slot_id ?? null }] as const;
     })
   );
-  const zoneDriverMap = new Map(zoneDriverEntries);
+  const zoneAssignmentMap = new Map(zoneAssignmentEntries);
 
   const projected = due.map((pref) => {
     const addr = pref.address_id ? explicitAddrMap.get(pref.address_id) : defaultAddrMap.get(pref.customer_id);
     const zoneId: string | null = addr?.zone_id ?? null;
+    const assignment = zoneId ? zoneAssignmentMap.get(zoneId) : null;
     return {
       customer_id: pref.customer_id,
       address_id: addr?.id ?? null,
       zone_id: zoneId,
-      driver_id: zoneId ? (zoneDriverMap.get(zoneId) ?? null) : null,
+      driver_id: assignment?.driverId ?? null,
+      time_slot_id: assignment?.timeSlotId ?? null,
       payment_method_snapshot: (payMap.get(pref.customer_id) as "cash" | "monthly") ?? "cash",
       items: itemsByCustomer.get(pref.customer_id) ?? [],
     };

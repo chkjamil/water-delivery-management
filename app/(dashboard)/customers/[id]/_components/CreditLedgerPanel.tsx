@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Wallet, Check } from "lucide-react";
+import { Wallet, Check, Paperclip } from "lucide-react";
 import { recordCreditPayment } from "../../actions";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
@@ -12,6 +12,8 @@ interface TransactionRow {
   amount: number;
   note: string | null;
   created_at: string;
+  evidence_url?: string | null;
+  evidence_pending?: boolean; // just-added, evidence uploaded but signed URL not resolved yet
 }
 
 export default function CreditLedgerPanel({
@@ -19,19 +21,28 @@ export default function CreditLedgerPanel({
 }: { customerId: string; creditBalance: number; initialTransactions: TransactionRow[] }) {
   const [transactions, setTransactions] = useState(initialTransactions);
   const [amount, setAmount]             = useState("");
+  const [note, setNote]                 = useState("");
+  const [evidence, setEvidence]         = useState<File | null>(null);
   const [isPending, start]              = useTransition();
 
   function handleSettle() {
     const amt = parseFloat(amount);
     if (!amt || amt <= 0) { toast.error("Enter a valid amount"); return; }
     start(async () => {
-      const result = await recordCreditPayment(customerId, amt, "Balance settled by admin");
+      const result = await recordCreditPayment(customerId, amt, note.trim() || undefined, evidence ?? undefined);
       if (result.error) { toast.error(result.error); return; }
+      const t = result.transaction;
       setTransactions((prev) => [
-        { id: crypto.randomUUID(), type: "payment", amount: amt, note: "Balance settled by admin", created_at: new Date().toISOString() },
+        {
+          id: t?.id ?? crypto.randomUUID(),
+          type: "payment", amount: amt,
+          note: t?.note ?? (note.trim() || null),
+          created_at: t?.created_at ?? new Date().toISOString(),
+          evidence_pending: !!t?.evidence_path,
+        },
         ...prev,
       ]);
-      setAmount("");
+      setAmount(""); setNote(""); setEvidence(null);
       toast.success("Payment recorded");
     });
   }
@@ -48,9 +59,17 @@ export default function CreditLedgerPanel({
       </div>
       <div className="card-body space-y-3">
         {creditBalance > 0 && (
-          <div className="flex gap-2">
-            <input type="number" min="0" step="1" className="input flex-1" placeholder="Amount received"
+          <div className="space-y-2">
+            <input type="number" min="0" step="1" className="input" placeholder="Amount received"
               value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <textarea className="input text-sm" rows={2} placeholder="Notes (e.g. how it was paid)"
+              value={note} onChange={(e) => setNote(e.target.value)} />
+            <div>
+              <label className="label flex items-center gap-1.5"><Paperclip size={12} /> Evidence (optional — receipt, screenshot)</label>
+              <input type="file" accept="image/*,.pdf" className="input text-sm"
+                onChange={(e) => setEvidence(e.target.files?.[0] ?? null)} />
+              {evidence && <p className="text-xs text-green-600 mt-1">✓ {evidence.name}</p>}
+            </div>
             <button onClick={handleSettle} className="btn-primary btn-sm" disabled={isPending}>
               <Check size={14} /> {isPending ? "Saving…" : "Record Payment"}
             </button>
@@ -65,6 +84,17 @@ export default function CreditLedgerPanel({
                     {t.type === "accrual" ? "+ " : "− "}PKR {t.amount.toLocaleString()}
                   </span>
                   {t.note && <span className="text-xs text-slate-400 ml-2">{t.note}</span>}
+                  {t.evidence_url && (
+                    <a href={t.evidence_url} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-brand-600 hover:underline ml-2 inline-flex items-center gap-0.5">
+                      <Paperclip size={11} /> receipt
+                    </a>
+                  )}
+                  {t.evidence_pending && (
+                    <span className="text-xs text-slate-400 ml-2 inline-flex items-center gap-0.5">
+                      <Paperclip size={11} /> evidence attached
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs text-slate-400">{format(new Date(t.created_at), "MMM d, yyyy")}</span>
               </div>

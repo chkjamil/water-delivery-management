@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckCircle, Plus } from "lucide-react";
+import { CheckCircle, Plus, Camera } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { completeStop } from "../actions";
+import { captureLocation } from "@/lib/geolocation";
 import toast from "react-hot-toast";
 import type { MyStopRow } from "./MyStopsClient";
 
@@ -31,6 +32,7 @@ export default function CompleteStopModal({
   );
   const [addProductId, setAddProductId] = useState("");
   const [cashCollected, setCashCollected] = useState(true);
+  const [photo, setPhoto] = useState<File | null>(null);
   const [pending, start] = useTransition();
 
   const isMonthly = stop.payment_method_snapshot === "monthly";
@@ -49,9 +51,15 @@ export default function CompleteStopModal({
 
   function handle() {
     start(async () => {
+      const location = await captureLocation();
       const res = await completeStop(stop.id, {
         items: items.map((i) => ({ product_id: i.product_id, actual_qty: i.actual_qty })),
         cashCollected: isMonthly ? undefined : cashCollected,
+        proof: {
+          photo: photo ?? undefined,
+          lat: location?.lat, lng: location?.lng, accuracy: location?.accuracy,
+          locationAvailable: location !== null,
+        },
       });
       if (res.error) { toast.error(res.error); return; }
       toast.success("Delivery completed!");
@@ -122,6 +130,13 @@ export default function CompleteStopModal({
             Cash collected at delivery
           </label>
         )}
+
+        <div className="pt-1 border-t border-slate-100">
+          <label className="label flex items-center gap-1.5"><Camera size={13} /> Delivery Photo (optional)</label>
+          <input type="file" accept="image/*" capture="environment" className="input text-sm"
+            onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
+          {photo && <p className="text-xs text-green-600 mt-1">✓ {photo.name}</p>}
+        </div>
       </div>
     </Modal>
   );

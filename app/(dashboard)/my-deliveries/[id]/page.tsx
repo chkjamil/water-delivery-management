@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect, notFound } from "next/navigation";
 import DeliveryDetailClient, { type MyDeliveryDetail } from "../_components/DeliveryDetailClient";
 
@@ -21,6 +22,7 @@ export default async function MyDeliveryDetailPage({ params }: { params: Promise
     .from("deliveries")
     .select(`
       id, order_id, status, failed_reason, notes, empty_bottles_collected, delivered_at,
+      proof_lat, proof_lng, proof_photo_path, location_available,
       order:orders(
         id, order_number, delivery_date, total_amount,
         payment_method, payment_status, amount_paid, special_instructions,
@@ -44,9 +46,20 @@ export default async function MyDeliveryDetailPage({ params }: { params: Promise
     if (d?.driver_id !== user.id) redirect("/my-deliveries");
   }
 
+  // Photo lives in a private bucket — resolve a short-lived signed URL server-side
+  // now that we've confirmed the caller is allowed to view this delivery.
+  let proofPhotoUrl: string | null = null;
+  if (delivery.proof_photo_path) {
+    const { data: signed } = await createAdminClient()
+      .storage.from("delivery-proofs")
+      .createSignedUrl(delivery.proof_photo_path, 60 * 10);
+    proofPhotoUrl = signed?.signedUrl ?? null;
+  }
+
   const rawOrder = Array.isArray(delivery.order) ? (delivery.order[0] ?? null) : delivery.order ?? null;
   const normalized: MyDeliveryDetail = {
     ...delivery,
+    proof_photo_url: proofPhotoUrl,
     order: rawOrder ? {
       ...rawOrder,
       customer: Array.isArray(rawOrder.customer) ? (rawOrder.customer[0] ?? null) : rawOrder.customer ?? null,

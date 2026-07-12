@@ -421,6 +421,19 @@ const DELIVERY_UPDATE_TEMPLATE = `<!DOCTYPE html>
               </tr>
             </table>
 
+            {{#if ITEMS_HTML}}
+            <!-- Items delivered -->
+            <p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#0f172a">Items Delivered</p>
+            <table cellpadding="0" cellspacing="0" role="presentation" width="100%" style="margin-bottom:28px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+              <tr style="background:#f8fafc">
+                <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.4px">Item</td>
+                <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;text-align:center">Qty</td>
+                <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;text-align:right">Price</td>
+              </tr>
+              {{ITEMS_HTML}}
+            </table>
+            {{/if}}
+
             <!-- Status timeline -->
             <table cellpadding="0" cellspacing="0" role="presentation" width="100%" style="margin-bottom:28px">
               <tr>
@@ -654,11 +667,23 @@ export async function sendDeliveryUpdate(params: {
   driverName: string;
   deliveryDate: string;
   timeSlot: string;
+  items?: Array<{ name: string; quantity: number; unitPrice: number }>;
 }) {
   const meta = STATUS_META[params.status];
   if (!meta) return; // Don't send for statuses without a template
 
-  const html = render(DELIVERY_UPDATE_TEMPLATE, {
+  const itemsHtml = (params.items ?? [])
+    .map(
+      (item, i) => `
+      <tr style="background:${i % 2 === 0 ? "#fff" : "#f8fafc"}">
+        <td style="padding:10px 16px;font-size:14px;color:#1e293b">${item.name}</td>
+        <td style="padding:10px 16px;font-size:14px;color:#1e293b;text-align:center">${item.quantity}</td>
+        <td style="padding:10px 16px;font-size:14px;color:#1e293b;text-align:right">PKR ${(item.quantity * item.unitPrice).toFixed(0)}</td>
+      </tr>`
+    )
+    .join("");
+
+  let html = render(DELIVERY_UPDATE_TEMPLATE, {
     CUSTOMER_NAME:  params.customerName,
     ORDER_NUMBER:   params.orderNumber,
     STATUS_LABEL:   meta.label,
@@ -668,8 +693,16 @@ export async function sendDeliveryUpdate(params: {
     DRIVER_NAME:    params.driverName,
     DELIVERY_DATE:  params.deliveryDate,
     TIME_SLOT:      params.timeSlot,
+    ITEMS_HTML:     itemsHtml,
     ORDER_URL:      `${APP_URL}/my-orders`,
   });
+
+  // Handle {{#if ITEMS_HTML}} ... {{/if}} block
+  if (itemsHtml) {
+    html = html.replace(/\{\{#if ITEMS_HTML\}\}\s*/g, "").replace(/\s*\{\{\/if\}\}/g, "");
+  } else {
+    html = html.replace(/\{\{#if ITEMS_HTML\}\}[\s\S]*?\{\{\/if\}\}/g, "");
+  }
 
   await send({
     to: params.to,

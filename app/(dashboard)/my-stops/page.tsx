@@ -27,6 +27,7 @@ export default async function MyStopsPage() {
         id, status, payment_method_snapshot, cash_collected, skipped_reason,
         customer:profiles!delivery_stops_customer_id_fkey(full_name, phone),
         address:customer_addresses(address_line1, address_line2, city),
+        time_slot:time_slots(label, start_time, end_time),
         items:delivery_stop_items(id, product_id, planned_qty, actual_qty, unit_price, product:products(name, size_label))
       `)
       .eq("driver_id", session.user.id)
@@ -39,6 +40,7 @@ export default async function MyStopsPage() {
     ...s,
     customer: Array.isArray(s.customer) ? (s.customer[0] ?? null) : s.customer,
     address: Array.isArray(s.address) ? (s.address[0] ?? null) : s.address,
+    time_slot: Array.isArray(s.time_slot) ? (s.time_slot[0] ?? null) : s.time_slot ?? null,
     items: (s.items ?? []).map((it: any) => ({
       ...it,
       product: Array.isArray(it.product) ? (it.product[0] ?? null) : it.product,

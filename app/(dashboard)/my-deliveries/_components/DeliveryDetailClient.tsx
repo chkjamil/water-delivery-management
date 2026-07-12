@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArrowLeft, MapPin, Phone, Package, CheckCircle, XCircle, Play, Navigation } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Package, CheckCircle, XCircle, Play, Navigation, AlertTriangle, Camera } from "lucide-react";
 import Link from "next/link";
 import StatusBadge from "@/components/ui/StatusBadge";
 import DeliveredModal from "./DeliveredModal";
@@ -18,6 +18,10 @@ export type MyDeliveryDetail = {
   notes: string | null;
   empty_bottles_collected: number;
   delivered_at: string | null;
+  proof_lat: number | null;
+  proof_lng: number | null;
+  proof_photo_url: string | null;
+  location_available: boolean;
   order: {
     id: string;
     order_number: string;
@@ -206,6 +210,32 @@ export default function DeliveryDetailClient({ delivery: initial }: Props) {
           <p className="text-green-700 font-semibold">✅ Delivered successfully!</p>
           {delivery.empty_bottles_collected > 0 && (
             <p className="text-sm text-green-600 mt-1">{delivery.empty_bottles_collected} bottles collected</p>
+          )}
+        </div>
+      )}
+
+      {delivery.status === "delivered" && (delivery.proof_photo_url || !delivery.location_available) && (
+        <div className="card p-4 space-y-2">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+            <Camera size={12} /> Delivery Proof
+          </p>
+          {!delivery.location_available && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 flex items-center gap-1.5">
+              <AlertTriangle size={13} className="flex-shrink-0" /> Location unavailable at time of delivery — unverified
+            </p>
+          )}
+          {delivery.proof_photo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={delivery.proof_photo_url} alt="Delivery proof" className="rounded-lg w-full max-h-64 object-cover" />
+          )}
+          {delivery.proof_lat != null && delivery.proof_lng != null && (
+            <a
+              href={`https://www.google.com/maps?q=${delivery.proof_lat},${delivery.proof_lng}`}
+              target="_blank" rel="noopener noreferrer"
+              className="text-xs text-brand-600 hover:underline inline-flex items-center gap-1"
+            >
+              <MapPin size={12} /> View location on map
+            </a>
           )}
         </div>
       )}

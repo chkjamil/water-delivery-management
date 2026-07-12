@@ -18,24 +18,41 @@ export default async function MyDeliveriesPage() {
 
   const today = new Date().toISOString().split("T")[0];
 
-  const { data: deliveries } = await supabase
-    .from("deliveries")
-    .select(`
-      id, order_id, status,
-      order:orders(
-        order_number, delivery_date, total_amount,
-        payment_method, payment_status, amount_paid,
-        customer:profiles!orders_customer_id_fkey(full_name, phone),
-        address:customer_addresses(address_line1, address_line2, city),
-        time_slot:time_slots(label)
-      )
-    `)
-    .eq("driver_id", session.user.id)
-    .or(`status.eq.assigned,status.eq.loaded,status.eq.en_route,status.eq.delivered,status.eq.failed`)
-    .gte("created_at", today)
-    .order("created_at", { ascending: true });
+  const deliveryColumns = `
+    id, order_id, status,
+    order:orders(
+      order_number, delivery_date, total_amount,
+      payment_method, payment_status, amount_paid,
+      customer:profiles!orders_customer_id_fkey(full_name, phone),
+      address:customer_addresses(address_line1, address_line2, city),
+      time_slot:time_slots(label)
+    )
+  `;
 
-  const normalized = (deliveries ?? []).map((d) => {
+  // Every still-active delivery regardless of when it was created (a pending
+  // delivery from yesterday shouldn't vanish just because a new day started —
+  // previously this filtered on created_at >= today, which hid any delivery
+  // not created today even while still assigned/loaded/en_route), plus
+  // anything this driver actually resolved today for same-day reference.
+  const [{ data: active }, { data: resolvedToday }] = await Promise.all([
+    supabase
+      .from("deliveries")
+      .select(deliveryColumns)
+      .eq("driver_id", session.user.id)
+      .in("status", ["assigned", "loaded", "en_route"])
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("deliveries")
+      .select(deliveryColumns)
+      .eq("driver_id", session.user.id)
+      .in("status", ["delivered", "failed"])
+      .gte("updated_at", today)
+      .order("created_at", { ascending: true }),
+  ]);
+
+  const deliveries = [...(active ?? []), ...(resolvedToday ?? [])];
+
+  const normalized = deliveries.map((d) => {
     const o = Array.isArray(d.order) ? (d.order[0] ?? null) : d.order ?? null;
     return {
       ...d,

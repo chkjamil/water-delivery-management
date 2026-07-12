@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -84,12 +85,24 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     .eq("is_active", true)
     .order("name");
 
-  const { data: creditTransactions } = await supabase
+  const { data: creditTransactionsRaw } = await supabase
     .from("customer_credit_transactions")
-    .select("id, type, amount, note, created_at")
+    .select("id, type, amount, note, evidence_path, created_at")
     .eq("customer_id", id)
     .order("created_at", { ascending: false })
     .limit(20);
+
+  // Evidence lives in a private bucket — resolve short-lived signed URLs here,
+  // now that we've confirmed the caller is an admin/staff who's allowed to see it.
+  const creditTransactions = await Promise.all(
+    (creditTransactionsRaw ?? []).map(async (t) => {
+      if (!t.evidence_path) return { ...t, evidence_url: null };
+      const { data: signed } = await createAdminClient()
+        .storage.from("payment-evidence")
+        .createSignedUrl(t.evidence_path, 60 * 10);
+      return { ...t, evidence_url: signed?.signedUrl ?? null };
+    })
+  );
 
   const today = new Date().toISOString().split("T")[0];
   const { data: upcomingStops } = await supabase
@@ -284,19 +297,29 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {orders.map((o) => (
-                    <tr key={o.id} className="hover:bg-slate-50">
-                      <td className="px-5 py-3 font-mono text-xs text-brand-600">#{o.order_number}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{format(new Date(o.created_at), "MMM d, yyyy")}</td>
-                      <td className="px-4 py-3">
-                        <span className={`badge text-xs ${STATUS_COLOR[o.status] ?? "bg-slate-100 text-slate-600"}`}>
-                          {o.status}
-                        </span>
+                    <tr key={o.id} className="hover:bg-slate-50 cursor-pointer">
+                      <td className="p-0">
+                        <Link href={`/orders/${o.id}`} className="block px-5 py-3 font-mono text-xs text-brand-600">#{o.order_number}</Link>
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-800">PKR {o.total_amount.toLocaleString()}</td>
-                      <td className="px-4 py-3">
-                        <span className={`badge text-xs ${o.payment_status === "paid" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                          {o.payment_status}
-                        </span>
+                      <td className="p-0">
+                        <Link href={`/orders/${o.id}`} className="block px-4 py-3 text-xs text-slate-500">{format(new Date(o.created_at), "MMM d, yyyy")}</Link>
+                      </td>
+                      <td className="p-0">
+                        <Link href={`/orders/${o.id}`} className="block px-4 py-3">
+                          <span className={`badge text-xs ${STATUS_COLOR[o.status] ?? "bg-slate-100 text-slate-600"}`}>
+                            {o.status}
+                          </span>
+                        </Link>
+                      </td>
+                      <td className="p-0">
+                        <Link href={`/orders/${o.id}`} className="block px-4 py-3 text-right font-semibold text-slate-800">PKR {o.total_amount.toLocaleString()}</Link>
+                      </td>
+                      <td className="p-0">
+                        <Link href={`/orders/${o.id}`} className="block px-4 py-3">
+                          <span className={`badge text-xs ${o.payment_status === "paid" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                            {o.payment_status}
+                          </span>
+                        </Link>
                       </td>
                     </tr>
                   ))}

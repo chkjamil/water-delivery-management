@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { format } from "date-fns";
-import { Plus, ShoppingBag, CalendarClock, MapPin, Wallet, Package } from "lucide-react";
+import { Plus, ShoppingBag, CalendarClock, MapPin, Wallet, Package, Paperclip } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 
 interface Order { id: string; order_number: string; status: string; payment_status: string; total_amount: number; delivery_date: string | null; created_at: string; }
 interface DeliveryPreference { frequency: "weekly" | "biweekly" | "monthly"; days_of_week: number[]; days_of_month: number[]; is_active: boolean; }
 interface Address { id: string; label: string; address_line1: string; address_line2: string | null; city: string; is_default: boolean; }
 interface BottleRow { quantity_owned: number; product: { name: string; size_label: string } | null; }
+interface CreditTransaction { id: string; type: "accrual" | "payment"; amount: number; note: string | null; created_at: string; evidence_url: string | null; }
 
 const STATUS_BADGE: Record<string, string> = {
   pending: "badge-pending", confirmed: "badge-confirmed", dispatched: "badge-dispatch",
@@ -35,7 +36,7 @@ function describeSchedule(pref: DeliveryPreference | null): string | null {
 }
 
 export default function CustomerDashboard({
-  orders, fullName, deliveryPreference, addresses, paymentPreference, creditBalance, bottles,
+  orders, fullName, deliveryPreference, addresses, paymentPreference, creditBalance, bottles, creditTransactions,
 }: {
   orders: Order[];
   fullName: string;
@@ -44,6 +45,7 @@ export default function CustomerDashboard({
   paymentPreference: "cash" | "monthly";
   creditBalance: number;
   bottles: BottleRow[];
+  creditTransactions: CreditTransaction[];
 }) {
   const activeOrder = orders.find((o) => !["delivered", "cancelled", "failed"].includes(o.status));
   const scheduleText = describeSchedule(deliveryPreference);
@@ -87,6 +89,32 @@ export default function CustomerDashboard({
               </span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Payment/credit transaction history */}
+      {creditTransactions.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-slate-700 mb-3">Payment History</h3>
+          <div className="card divide-y divide-slate-50">
+            {creditTransactions.map((t) => (
+              <div key={t.id} className="px-4 py-2.5 flex items-center justify-between text-sm">
+                <div>
+                  <span className={t.type === "accrual" ? "text-red-600" : "text-green-600"}>
+                    {t.type === "accrual" ? "+ " : "− "}PKR {t.amount.toLocaleString()}
+                  </span>
+                  {t.note && <span className="text-xs text-slate-400 ml-2">{t.note}</span>}
+                  {t.evidence_url && (
+                    <a href={t.evidence_url} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-brand-600 hover:underline ml-2 inline-flex items-center gap-0.5">
+                      <Paperclip size={11} /> receipt
+                    </a>
+                  )}
+                </div>
+                <span className="text-xs text-slate-400">{format(new Date(t.created_at), "MMM d, yyyy")}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

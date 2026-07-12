@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, Camera } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { markDelivered } from "../actions";
+import { captureLocation } from "@/lib/geolocation";
 import toast from "react-hot-toast";
 
 interface Props {
@@ -15,12 +16,18 @@ interface Props {
 
 export default function DeliveredModal({ deliveryId, orderNumber, onClose, onDone }: Props) {
   const [bottles, setBottles] = useState("0");
+  const [photo, setPhoto] = useState<File | null>(null);
   const [pending, start] = useTransition();
 
   function handle() {
     const bottlesNum = parseInt(bottles) || 0;
     start(async () => {
-      const res = await markDelivered(deliveryId, bottlesNum);
+      const location = await captureLocation();
+      const res = await markDelivered(deliveryId, bottlesNum, {
+        photo: photo ?? undefined,
+        lat: location?.lat, lng: location?.lng, accuracy: location?.accuracy,
+        locationAvailable: location !== null,
+      });
       if (res.error) { toast.error(res.error); return; }
       toast.success("Delivery marked as delivered! 🎉");
       onDone();
@@ -58,6 +65,12 @@ export default function DeliveredModal({ deliveryId, orderNumber, onClose, onDon
             step={1}
           />
           <p className="text-xs text-slate-400 mt-1">Enter 0 if no bottles were returned</p>
+        </div>
+        <div>
+          <label className="label flex items-center gap-1.5"><Camera size={13} /> Delivery Photo (optional)</label>
+          <input type="file" accept="image/*" capture="environment" className="input text-sm"
+            onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
+          {photo && <p className="text-xs text-green-600 mt-1">✓ {photo.name}</p>}
         </div>
       </div>
     </Modal>

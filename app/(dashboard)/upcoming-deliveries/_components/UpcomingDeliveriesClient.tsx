@@ -37,6 +37,7 @@ export default function UpcomingDeliveriesClient({
                     <p className="text-sm font-medium text-slate-800">{stop.customer_name}</p>
                     <p className="text-xs text-slate-400">
                       {stop.zone_id ? zoneNames[stop.zone_id] ?? "Unknown zone" : "No zone"}
+                      {stop.time_slot_label && <span> · {stop.time_slot_label}</span>}
                       {!stop.driver_id && <span className="text-amber-600 ml-1">· unassigned</span>}
                     </p>
                   </div>

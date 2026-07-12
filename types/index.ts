@@ -181,6 +181,8 @@ export interface SchedulePlanDay {
   zone?: DeliveryZone;
   driver_id: string | null;
   driver?: Profile;
+  time_slot_id: string | null;
+  time_slot?: TimeSlot;
   created_at: string;
 }
 
@@ -191,6 +193,8 @@ export interface ScheduleOverride {
   zone?: DeliveryZone;
   driver_id: string | null;
   driver?: Profile;
+  time_slot_id: string | null;
+  time_slot?: TimeSlot;
   is_skipped: boolean;
   note: string | null;
   created_by: string;
@@ -322,6 +326,8 @@ export interface DeliveryStop {
   zone?: DeliveryZone;
   driver_id: string | null;
   driver?: Profile;
+  time_slot_id: string | null;
+  time_slot?: TimeSlot;
   status: DeliveryStopStatus;
   payment_method_snapshot: PaymentMethodPreference;
   order_id: string | null;

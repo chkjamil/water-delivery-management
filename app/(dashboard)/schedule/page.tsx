@@ -22,10 +22,11 @@ export default async function SchedulePage({
   const now = new Date();
   const planMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
-  const [{ data: plan }, { data: zones }, { data: drivers }] = await Promise.all([
+  const [{ data: plan }, { data: zones }, { data: drivers }, { data: timeSlots }] = await Promise.all([
     supabase.from("schedule_plans").select("*").eq("plan_month", planMonth).maybeSingle(),
     supabase.from("delivery_zones").select("id, name, delivery_fee, is_active, created_at").eq("is_active", true).order("name"),
     supabase.from("profiles").select("id, full_name, phone").in("role", ["staff", "delivery_person"]).eq("is_active", true).order("full_name"),
+    supabase.from("time_slots").select("id, label, start_time, end_time, max_orders, is_active").eq("is_active", true).order("start_time"),
   ]);
 
   const { data: planDays } = plan
@@ -49,6 +50,7 @@ export default async function SchedulePage({
       initialOverrides={overrides ?? []}
       zones={zones ?? []}
       drivers={drivers ?? []}
+      timeSlots={timeSlots ?? []}
     />
   );
 }

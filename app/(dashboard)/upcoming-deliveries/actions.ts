@@ -23,6 +23,8 @@ export interface UpcomingStop {
   customer_phone: string | null;
   zone_id: string | null;
   driver_id: string | null;
+  time_slot_id: string | null;
+  time_slot_label: string | null;
   payment_method_snapshot: "cash" | "monthly";
 }
 
@@ -53,10 +55,17 @@ export async function getUpcomingProjection(days = 7): Promise<{ error: string |
   const perDay = await Promise.all(dates.map((date) => computeDueCustomers(admin, date)));
 
   const allCustomerIds = Array.from(new Set(perDay.flat().map((s) => s.customer_id)));
-  const { data: profiles } = allCustomerIds.length > 0
-    ? await admin.from("profiles").select("id, full_name, phone").in("id", allCustomerIds)
-    : { data: [] as { id: string; full_name: string; phone: string | null }[] };
+  const allTimeSlotIds = Array.from(new Set(perDay.flat().map((s) => s.time_slot_id).filter((x): x is string => !!x)));
+  const [{ data: profiles }, { data: timeSlots }] = await Promise.all([
+    allCustomerIds.length > 0
+      ? admin.from("profiles").select("id, full_name, phone").in("id", allCustomerIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string; phone: string | null }[] }),
+    allTimeSlotIds.length > 0
+      ? admin.from("time_slots").select("id, label").in("id", allTimeSlotIds)
+      : Promise.resolve({ data: [] as { id: string; label: string }[] }),
+  ]);
   const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const timeSlotMap = new Map((timeSlots ?? []).map((t) => [t.id, t.label]));
 
   const upcoming: UpcomingDay[] = dates.map((date, i) => {
     let due = perDay[i];
@@ -69,6 +78,8 @@ export async function getUpcomingProjection(days = 7): Promise<{ error: string |
         customer_phone: profileMap.get(d.customer_id)?.phone ?? null,
         zone_id: d.zone_id,
         driver_id: d.driver_id,
+        time_slot_id: d.time_slot_id,
+        time_slot_label: d.time_slot_id ? (timeSlotMap.get(d.time_slot_id) ?? null) : null,
         payment_method_snapshot: d.payment_method_snapshot,
       })),
     };

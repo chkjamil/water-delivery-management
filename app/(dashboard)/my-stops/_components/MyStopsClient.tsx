@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MapPin, Phone, CheckCircle, XCircle, Wallet } from "lucide-react";
+import { MapPin, Phone, CheckCircle, XCircle, Wallet, Clock } from "lucide-react";
 import CompleteStopModal from "./CompleteStopModal";
 import SkipStopModal from "./SkipStopModal";
 
@@ -13,6 +13,7 @@ export interface MyStopRow {
   skipped_reason: string | null;
   customer: { full_name: string; phone: string | null } | null;
   address: { address_line1: string; address_line2: string | null; city: string } | null;
+  time_slot: { label: string; start_time: string; end_time: string } | null;
   items: {
     id: string; product_id: string; planned_qty: number; actual_qty: number | null; unit_price: number;
     product: { name: string; size_label: string } | null;
@@ -96,6 +97,13 @@ export default function MyStopsClient({ initialStops, products }: { initialStops
                       {stop.address.address_line2 && `, ${stop.address.address_line2}`}
                       , {stop.address.city}
                     </span>
+                  </div>
+                )}
+
+                {stop.time_slot && (
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <Clock size={14} className="text-slate-400 flex-shrink-0" />
+                    <span>{stop.time_slot.label}</span>
                   </div>
                 )}
 

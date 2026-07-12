@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect, notFound } from "next/navigation";
 import OrderDetailClient, { type OrderDetail } from "../_components/OrderDetailClient";
 
@@ -37,6 +38,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       delivery:deliveries(
         id, status, assigned_at, dispatched_at, delivered_at,
         failed_reason, empty_bottles_collected,
+        proof_lat, proof_lng, proof_photo_path, location_available,
         driver:profiles!deliveries_driver_id_fkey(full_name, phone)
       )
     `)
@@ -47,6 +49,16 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   const rawAddress = Array.isArray(order.address) ? (order.address[0] ?? null) : order.address ?? null;
   const rawDelivery = Array.isArray(order.delivery) ? (order.delivery[0] ?? null) : order.delivery ?? null;
+
+  // Photo lives in a private bucket — resolve a short-lived signed URL server-side
+  // now that we've confirmed the caller is allowed to view this order.
+  let proofPhotoUrl: string | null = null;
+  if (rawDelivery?.proof_photo_path) {
+    const { data: signed } = await createAdminClient()
+      .storage.from("delivery-proofs")
+      .createSignedUrl(rawDelivery.proof_photo_path, 60 * 10);
+    proofPhotoUrl = signed?.signedUrl ?? null;
+  }
 
   const normalized = {
     ...order,
@@ -59,6 +71,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     delivery: rawDelivery ? {
       ...rawDelivery,
       driver: Array.isArray(rawDelivery.driver) ? (rawDelivery.driver[0] ?? null) : rawDelivery.driver ?? null,
+      proof_photo_url: proofPhotoUrl,
     } : null,
     order_items: (order.order_items ?? []).map((item: any) => ({
       ...item,
